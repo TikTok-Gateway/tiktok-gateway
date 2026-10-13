@@ -1,46 +1,104 @@
 # Подключение n8n
 
-Импортируйте `examples/n8n-workflow.json` вручную. Workflow по умолчанию выключен.
-Нужны стандартные Webhook, Wait, Edit Fields, HTTP Request, If и Stop And Error.
+## Установка через npm
 
-1. В Webhook создайте **Header Auth** credential: Name `Authorization`, Value
-   `Bearer <отдельный webhook token>`. Он должен совпадать с `WEBHOOK_TOKEN_FILE`.
-2. Для всех четырёх HTTP Request нод выберите другой **Header Auth** credential:
-   Name `Authorization`, Value `Bearer <API token>`. Токены в экспорт не вставляйте.
-3. В Configuration задайте `gatewayUrl`, текст и `stickerId` из `GET /v1/stickers`.
-   Посмотрите `/v1/stickers/{id}/preview` с тем же API credential перед выбором.
-4. При необходимости измените первую Wait. После каждой отправки Wait + GET
-   опрашивают операцию каждые 5 секунд. Продолжение допускается только при succeeded.
-   failed, uncertain и неизвестные состояния заканчиваются Stop And Error с причиной.
-   Ошибка HTTP также останавливает execution. Пока queued/sending/verifying, опрос
-   продолжается; настройте timeout execution в n8n под ожидаемую длительность паузы.
-5. Включите workflow и укажите его **Production URL** в gateway `WEBHOOK_URL`.
+Используйте пакет [n8n-nodes-tiktok-gateway](https://www.npmjs.com/package/n8n-nodes-tiktok-gateway).
+Исходники, пример workflow, тесты и выпуск пакета находятся в
+[отдельном репозитории](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway).
+Gateway-репозиторий содержит только API и конфигурацию совместного запуска.
 
-Test URL работает только когда n8n слушает тестовый webhook в редакторе. Production
-URL предназначен для включённого/опубликованного workflow. Не оставляйте gateway
-на Test URL после отладки. Нода отвечает сразу после принятия; gateway не ждёт Wait
-и окончания workflow. Ошибка позднее в n8n не возвращает событие автоматически:
-используйте n8n retry execution с исходным webhook payload.
+1. В self-hosted n8n откройте **Settings → Community Nodes → Install**.
+2. Введите `n8n-nodes-tiktok-gateway`, подтвердите предупреждение о community-пакете
+   и нажмите **Install**. Установка непроверенных community-пакетов должна быть
+   разрешена администратором. Это не verified-пакет для n8n Cloud.
+3. Создайте credential **TikTok Gateway**: URL API, API token и отдельный webhook
+   token. Токены должны совпадать с `API_TOKEN_FILE` и `WEBHOOK_TOKEN_FILE` gateway.
+4. Скачайте [пример welcome.json](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway/blob/main/examples/welcome.json)
+   и импортируйте через **Import from File**. Выберите credential в трёх TikTok-нодах,
+   проверьте текст, задержку и выберите стикер из каталога API.
+5. Опубликуйте workflow и задайте его production URL в `WEBHOOK_URL` gateway.
+   Gateway поддерживает один webhook URL: используйте один триггер и ветвления.
 
-Ключи: `eventId:welcome-v1:text-1` и `eventId:welcome-v1:sticker-1`. Они не зависят
-от ID execution. Повторное событие создаёт ещё один execution, но API возвращает
-прежние операции обоим executions. Оба могут дойти до стикера, однако его ключ
-также один, поэтому повторной отправки нет. Если одна операция uncertain, обе
-ветки останавливаются. Не меняйте ключ для обхода ошибки. При изменении текста
-уже обработанного события прежний ключ даст 409 — это намеренная защита.
+Сценарий: **New Follower → Wait → Send Text → Send Sticker**.
+Получатель передаётся из события, запросы и проверка результата скрыты внутри нод.
+Тексты сообщений отправляются без перевода. Все обращения идут через gateway.
 
-Сохраняйте постоянные ID сценария/действий между перезапусками и импортами.
-Новый ID сценария означает новые команды для того же eventId. При добавлении
-нового действия дайте ему отдельный постоянный ID. Логику «один раз приветствовать
-пользователя за всё время», маршрутизацию событий, фильтр давности по `occurredAt`
-и любые AI-решения добавляйте в n8n. Пример принимает все follower.created версии 1.
+Проверенная совместимость пакета: n8n **2.43.4**, Node.js 22+.
+Актуальные требования указаны в [README пакета](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway#readme).
 
-Выключение workflow прекращает приём новых webhook по production URL, но не
-отменяет уже принятые операции gateway и не гарантирует остановку активных
-executions n8n. Для общей остановки отправок используйте `/v1/control/pause`.
-При выключенном workflow события могут накопиться в gateway и прийти позднее.
+## Локальная интеграция через Compose
 
-Официальные справочники:
-- [Webhook: test и production URL](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/)
-- [HTTP Request credentials](https://docs.n8n.io/integrations/builtin/credentials/httprequest/)
-- [Wait](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.wait/)
+1. Подготовьте `TIKTOK_ACCOUNT_ID` и secrets по [README](../README.md#запуск).
+   Запустите из корня репозитория:
+
+   ```sh
+   docker compose -f compose.yaml -f compose.n8n.yaml up -d --build
+   ```
+
+   Команда собирает gateway; n8n запускается из закреплённого официального образа.
+   Собственный образ n8n и копирование файлов нод не нужны.
+2. Откройте http://localhost:5678, создайте владельца n8n и установите npm-пакет
+   через Community Nodes по инструкции выше.
+3. В credential укажите `http://tiktok-gateway:8080` как Gateway URL.
+   `localhost` внутри n8n указывает на контейнер n8n, а не на gateway.
+4. Импортируйте пример и опубликуйте настроенный workflow. Compose уже задаёт
+   `WEBHOOK_URL=http://n8n:5678/webhook/tiktok-follower-gateway` для gateway.
+   Не публикуйте второй триггер на тот же путь.
+5. Проверьте готовность: `curl --fail http://localhost:8080/readyz`.
+   На новом volume отправки стоят на паузе. Снимайте её через API только когда
+   готовы к реальным сообщениям, как описано в [README](../README.md#запуск).
+   Ноды никогда не снимают паузу автоматически.
+
+Стенд использует реальный TikTok-аккаунт. Не отправляйте синтетические события
+в production webhook для проверки установки: они могут привести к сообщениям.
+Для проверки нод используется изолированный smoke-тест в репозитории пакета.
+
+Сервисы используют общую сеть и отдельные постоянные volumes. `/home/node/.n8n`
+сохраняет npm-пакеты, workflows, credentials и ключ шифрования. Не используйте
+`down -v`. Порты опубликованы только на loopback; для удалённого доступа настройте
+HTTPS и соответствующие публичные URL. Не запускайте второй gateway для того же
+аккаунта. При управлении этим стендом используйте обе опции `-f`.
+
+## Доставка, ключи и перезапуски
+
+- **New Follower** проверяет авторизацию и payload webhook. Заголовки и токены
+  не передаются в execution. Production URL работает у опубликованного workflow;
+  Test URL — только пока редактор слушает тестовый webhook. Не переключайте
+  production gateway на Test URL для проверки установки.
+- **Send Text** и **Send Sticker** сохраняют данные события и item linking,
+  продолжают workflow только после `succeeded`. Оставьте **Stop Workflow** при
+  ошибке. Диагностика содержит `operationId`, `reason` и доступные
+  `tiktokRejection.status/check`; сырые HTTP-ошибки и токены скрыты.
+- Ключ — `eventId:actionKey`, а без явного action key —
+  `eventId:workflowId:nodeId`. В примере используются `welcome-v1:text-1` и
+  `welcome-v1:sticker-1`. Сохраняйте ID workflow/нод и ключи при Retry, повторной
+  доставке и миграции. Не создавайте новый ключ для обхода `failed` или `uncertain`.
+  Дедупликация зависит от сохранности БД gateway.
+- Опрос операции идёт раз в секунду, по умолчанию до 300 секунд. **Таймаут,
+  остановка execution или перезапуск n8n не отменяют принятую команду gateway.**
+  Проверьте состояние операции и повторяйте исходное событие с тем же ключом.
+- Опрос внутри ноды не является сохранённым Wait. После аварии execution может
+  потребовать ручного Retry. Обычный n8n Wait от 65 секунд проверен с перезапуском
+  и постоянным хранилищем; короткие ожидания могут оставаться в памяти.
+- Ответ webhook подтверждает принятие события, а не завершение сообщений.
+  Ошибка downstream не запускает доставку события заново автоматически.
+  При выключенном workflow события могут накопиться и прийти позднее;
+  фильтрацию по `occurredAt` при необходимости добавьте в workflow.
+
+## Обновление и миграция
+
+Обновляйте пакет в **Settings → Community Nodes**. Перед обновлением сохраните
+резервную копию данных n8n и учтите активные/ожидающие executions; если n8n запросит
+перезапуск, выполните его в окно обслуживания. Пересборка Docker-образа не нужна.
+В queue mode установите одну версию пакета на все main, webhook и worker instances.
+
+Для существующего workflow следуйте
+[инструкции миграции в репозитории пакета](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway/blob/main/docs/MIGRATION.md):
+сохраните ID нод, credentials, связи и ключи действий. Импорт нового примера не
+заменяет миграцию текущего workflow. Старые execution snapshots могут ссылаться
+на прежние типы нод: завершите или разберите их до удаления прежней реализации
+из работающего n8n. Удаление исходников из gateway-репозитория не переписывает историю.
+
+Пакет автоматически собирается, проверяется в изолированном n8n и публикуется в npm
+по тегам версий в собственном CI. Процесс выпуска описан в
+[Publishing](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway/blob/main/docs/PUBLISHING.md).

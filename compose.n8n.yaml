@@ -1,0 +1,41 @@
+# docker compose -f compose.yaml -f compose.n8n.yaml up -d --build
+services:
+  tiktok-gateway:
+    image: tiktok-gateway:integration
+    build: .
+    environment:
+      WEBHOOK_URL: http://n8n:5678/webhook/tiktok-follower-gateway
+    depends_on:
+      n8n:
+        condition: service_healthy
+
+  n8n:
+    # Custom TikTok nodes are installed through Community Nodes in the persistent volume.
+    image: docker.n8n.io/n8nio/n8n@sha256:c34ee9107a42b837e25cec0c8a927ab90a45b776aa2ccbf15e5b9cda466fad2c
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:5678/
+      WEBHOOK_URL: http://localhost:5678/
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      GENERIC_TIMEZONE: Europe/Moscow
+      TZ: Europe/Moscow
+    volumes:
+      - n8n-data:/home/node/.n8n
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5678/healthz/readiness').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  n8n-data:

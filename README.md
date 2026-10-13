@@ -123,9 +123,34 @@ API не содержит принудительного сброса неопр
 
 ## n8n
 
-[Импортируемый пример](examples/n8n-workflow.json), [настройка и семантика](docs/N8N.md).
-Экспорт не содержит credentials и не устанавливается автоматически.
-Workflow: Webhook → Wait → текст → опрос до succeeded → стикер → опрос до succeeded.
+Ноды поддерживаются в отдельном репозитории
+[n8n-nodes-tiktok-gateway](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway)
+и устанавливаются из [npm](https://www.npmjs.com/package/n8n-nodes-tiktok-gateway).
+В self-hosted n8n откройте **Settings → Community Nodes → Install**, введите
+`n8n-nodes-tiktok-gateway` и подтвердите установку. Сборка собственного образа
+n8n не нужна. Пакет не является verified-нодой для n8n Cloud.
+
+Создайте одно подключение **TikTok Gateway** (URL API, API token и отдельный
+webhook token) и выберите его в трёх нодах. Скачайте и импортируйте
+[пример workflow из репозитория пакета](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway/blob/main/examples/welcome.json):
+**New Follower → Wait → Send Text → Send Sticker**.
+HTTP-запросы и ожидание подтверждённого `succeeded` выполняются внутри нод.
+
+Для совместного локального запуска используйте
+[`compose.n8n.yaml`](compose.n8n.yaml) поверх основной конфигурации:
+
+```sh
+docker compose -f compose.yaml -f compose.n8n.yaml up -d --build
+```
+
+Предварительно задайте `TIKTOK_ACCOUNT_ID` и подготовьте три файла secrets из
+раздела «Запуск». Эта команда собирает gateway из текущих исходников; n8n использует
+официальный образ и постоянный volume для workflows, credentials и npm-пакетов.
+Стенд работает с реальным TikTok-аккаунтом. n8n доступен на http://localhost:5678,
+API — на http://localhost:8080. На новом volume отправки остаются на паузе до
+осознанного `resume`. Установите пакет через Community Nodes после первого запуска.
+
+[Настройка, обновление и ограничения](docs/N8N.md).
 
 Получайте `userId` из `follower.created.data.userId` или доверенного источника
 числовых TikTok ID; API не принимает username вместо ID.
@@ -154,15 +179,14 @@ go vet ./...
 (cd third_party/matrix-tiktok && go test -race ./...)
 docker build -t tiktok-gateway:smoke .
 python3 scripts/smoke.py
-python3 scripts/n8n_smoke.py
 python3 scripts/audit_public.py
 ```
 
 Smoke test запускает отдельный Compose project с mock TikTok и webhook-приёмником,
 проверяет очередь, дубликаты, сохранение после пересоздания контейнера и webhook.
-Отдельный `n8n_smoke.py` импортирует и дважды исполняет workflow в одноразовом
-n8n-контейнере, проверяя отсутствие повторных команд. Ни один тест не читает
-реальные cookies и не отправляет реальные сообщения.
+Ни один тест не читает реальные cookies и не отправляет реальные сообщения.
+Unit-тесты нод и smoke-тест с настоящим n8n и mock gateway выполняются
+[в CI npm-пакета](https://github.com/TikTok-Gateway/n8n-nodes-tiktok-gateway/actions).
 Runtime image содержит только gateway, CA-сертификаты и стороннюю лицензию.
 Старый локальный UI, персональные probes и настройки исключены из Git и build context.
 `internal/greeter` сохранён как legacy-библиотека для протокола и формата миграции;
@@ -173,4 +197,4 @@ CI: PR — тесты, smoke и multiarch build без публикации; mai
 после проверок. Видимость GHCR package настраивается отдельно на Public.
 
 Сторонний клиент: [MIT license](third_party/matrix-tiktok/LICENSE).
-Входящие сообщения, `message.received`, AI и собственные ноды n8n — вне этой версии.
+Входящие сообщения, `message.received`, AI — вне этой версии.

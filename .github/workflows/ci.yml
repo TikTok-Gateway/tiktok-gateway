@@ -25,7 +25,6 @@ jobs:
       - run: python3 scripts/audit_public.py
       - run: docker build -t tiktok-gateway:smoke .
       - run: python3 scripts/smoke.py
-      - run: python3 scripts/n8n_smoke.py
   image:
     needs: test
     runs-on: ubuntu-latest
