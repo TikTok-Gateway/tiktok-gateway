@@ -32,10 +32,10 @@ Gateway-репозиторий содержит только API и конфиг
    Запустите из корня репозитория:
 
    ```sh
-   docker compose -f compose.yaml -f compose.n8n.yaml up -d --build
+   docker compose -f compose.yaml -f compose.n8n.yaml up -d
    ```
 
-   Команда собирает gateway; n8n запускается из закреплённого официального образа.
+   Команда запускает gateway из публичного образа GHCR; n8n — из закреплённого официального образа.
    Собственный образ n8n и копирование файлов нод не нужны.
 2. Откройте http://localhost:5678, создайте владельца n8n и установите npm-пакет
    через Community Nodes по инструкции выше.

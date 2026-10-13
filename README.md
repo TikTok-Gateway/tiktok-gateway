@@ -144,11 +144,11 @@ HTTP-запросы и ожидание подтверждённого `succeede
 [`compose.n8n.yaml`](compose.n8n.yaml) поверх основной конфигурации:
 
 ```sh
-docker compose -f compose.yaml -f compose.n8n.yaml up -d --build
+docker compose -f compose.yaml -f compose.n8n.yaml up -d
 ```
 
 Предварительно задайте `TIKTOK_ACCOUNT_ID` и подготовьте три файла secrets из
-раздела «Запуск». Эта команда собирает gateway из текущих исходников; n8n использует
+раздела «Запуск». Эта команда запускает публичный образ gateway из GHCR; n8n использует
 официальный образ и постоянный volume для workflows, credentials и npm-пакетов.
 Стенд работает с реальным TikTok-аккаунтом. n8n доступен на http://localhost:5678,
 API — на http://localhost:8080. На новом volume отправки остаются на паузе до

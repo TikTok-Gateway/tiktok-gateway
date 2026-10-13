@@ -1,8 +1,6 @@
-# docker compose -f compose.yaml -f compose.n8n.yaml up -d --build
+# docker compose -f compose.yaml -f compose.n8n.yaml up -d
 services:
   tiktok-gateway:
-    image: tiktok-gateway:integration
-    build: .
     environment:
       WEBHOOK_URL: http://n8n:5678/webhook/tiktok-follower-gateway
     depends_on:
