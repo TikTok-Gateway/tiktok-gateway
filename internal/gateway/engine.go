@@ -10,6 +10,7 @@ import (
 )
 
 type Sticker struct {
+	Name    string `json:"name,omitempty"`
 	ID      string `json:"id"`
 	Preview string `json:"preview"`
 }
@@ -163,7 +164,7 @@ func (e *Engine) Work(ctx context.Context) error {
 	}
 	if o.Command.Type == "sticker" {
 		if err = e.API.ReadyStickerID(ctx, o.Command.StickerID); err != nil {
-			return e.finish(o, "failed", "sticker_source_unavailable", "")
+			return e.finish(o, "failed", "sticker_unavailable", "")
 		}
 	}
 	e.gate.Lock()

@@ -75,6 +75,6 @@ func (m *Mock) Verify(_ context.Context, o Operation) (bool, error) {
 	return o.MessageID == "mock-ack", nil
 }
 func (m *Mock) Stickers(context.Context) ([]Sticker, error) {
-	return []Sticker{{"1", "/v1/stickers/1/preview"}}, nil
+	return []Sticker{{ID: "1", Preview: "/v1/stickers/1/preview"}}, nil
 }
 func (m *Mock) Preview(context.Context, string) ([]byte, string, error) { return nil, "", ErrNotFound }

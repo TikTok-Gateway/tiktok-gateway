@@ -233,7 +233,7 @@ func TestStickerMissingNoSubstitution(t *testing.T) {
 	must(t, e.Work(context.Background()))
 	o, err = s.Get(o.ID)
 	must(t, err)
-	if o.State != "failed" || o.Reason != "sticker_source_unavailable" || f.sends.Load() != 0 {
+	if o.State != "failed" || o.Reason != "sticker_unavailable" || f.sends.Load() != 0 {
 		t.Fatal(o)
 	}
 }

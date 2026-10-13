@@ -284,3 +284,6 @@ func (t *TikTok) StickerChoices(ctx context.Context) ([]StickerChoice, error) {
 	}
 	return out, nil
 }
+
+// SetSticker supplies an already validated catalogue template for the next send.
+func (t *TikTok) SetSticker(sticker *tt.Sticker) { t.sticker = sticker }

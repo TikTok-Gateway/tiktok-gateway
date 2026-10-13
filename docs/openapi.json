@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TikTok Gateway",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "One account per service. Durable idempotency, conservative reconciliation, at-least-once webhooks. No exactly-once guarantee."
   },
   "servers": [
@@ -387,11 +387,11 @@
     },
     "/v1/stickers": {
       "get": {
-        "summary": "Owner sticker messages from configured source conversation",
+        "summary": "Persistent local sticker catalogue; no chat lookup",
         "operationId": "get__v1_stickers",
         "responses": {
           "200": {
-            "description": "Owner sticker messages from configured source conversation",
+            "description": "Persistent local sticker catalogue; no chat lookup",
             "content": {
               "application/json": {
                 "schema": {
@@ -401,11 +401,18 @@
                       "type": "array",
                       "items": {
                         "type": "object",
+                        "required": [
+                          "id",
+                          "preview"
+                        ],
                         "properties": {
                           "id": {
                             "type": "string",
                             "pattern": "^[1-9][0-9]*$",
                             "description": "Numeric ID encoded as a string; never a JSON number."
+                          },
+                          "name": {
+                            "type": "string"
                           },
                           "preview": {
                             "type": "string"
@@ -441,13 +448,141 @@
         }
       }
     },
+    "/v1/stickers/import": {
+      "post": {
+        "summary": "Copy an owned sticker from an existing conversation into the local catalogue",
+        "operationId": "post__v1_stickers_import",
+        "responses": {
+          "200": {
+            "description": "Copy an owned sticker from an existing conversation into the local catalogue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "preview"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*$",
+                      "description": "Numeric ID encoded as a string; never a JSON number."
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "preview": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid import",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source conversation or sticker not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Catalogue ID already has different content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Import unsupported by adapter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sourceUserId",
+                  "messageId",
+                  "name"
+                ],
+                "properties": {
+                  "sourceUserId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$",
+                    "description": "Numeric ID encoded as a string; never a JSON number."
+                  },
+                  "messageId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$",
+                    "description": "Numeric ID encoded as a string; never a JSON number."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/stickers/{id}/preview": {
       "get": {
-        "summary": "Fetch image without exposing signed CDN URL",
+        "summary": "Read locally stored image without chat or CDN requests",
         "operationId": "get__v1_stickers_id_preview",
         "responses": {
           "200": {
-            "description": "Fetch image without exposing signed CDN URL",
+            "description": "Read locally stored image without chat or CDN requests",
             "content": {
               "image/png": {
                 "schema": {
@@ -496,7 +631,7 @@
             }
           },
           "404": {
-            "description": "Source sticker not found",
+            "description": "Catalogue sticker not found",
             "content": {
               "application/json": {
                 "schema": {

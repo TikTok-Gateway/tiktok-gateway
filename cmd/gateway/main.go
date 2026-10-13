@@ -92,8 +92,34 @@ func run() error {
 		fmt.Println("legacy_import_complete_paused")
 		return nil
 	}
+	if len(os.Args) > 1 && os.Args[1] == "import-sticker" {
+		flags := flag.NewFlagSet("import-sticker", flag.ContinueOnError)
+		id := flags.String("id", "", "stable numeric catalogue ID")
+		name := flags.String("name", "", "display name")
+		attachment := flags.String("attachment", "", "sticker-only protobuf attachment file")
+		media := flags.String("media", "", "local image file")
+		if err := flags.Parse(os.Args[2:]); err != nil {
+			return err
+		}
+		if *attachment == "" || *media == "" || flags.NArg() != 0 {
+			return errors.New("import-sticker requires --id --name --attachment --media")
+		}
+		a, err := os.ReadFile(*attachment)
+		if err != nil {
+			return errors.New("cannot read attachment")
+		}
+		b, err := os.ReadFile(*media)
+		if err != nil {
+			return errors.New("cannot read media")
+		}
+		if err := s.ImportSticker(gw.CatalogSticker{ID: *id, Name: *name, Attachment: a, Media: b}); err != nil {
+			return err
+		}
+		fmt.Println("sticker_import_complete")
+		return nil
+	}
 	if len(os.Args) > 1 {
-		return errors.New("usage: gateway [import --legacy-state PATH | healthcheck]")
+		return errors.New("usage: gateway [import --legacy-state PATH | import-sticker --id ID --name NAME --attachment PATH --media PATH | healthcheck]")
 	}
 	token, err := secret("API_TOKEN_FILE")
 	if err != nil {
@@ -122,14 +148,7 @@ func run() error {
 		if e != nil {
 			return e
 		}
-		source := os.Getenv("STICKER_SOURCE_USER_ID")
-		if source != "" {
-			n, e := strconv.ParseUint(source, 10, 64)
-			if e != nil || n == 0 || source == account {
-				return errors.New("invalid STICKER_SOURCE_USER_ID")
-			}
-		}
-		api = &gw.TikTok{Client: tt.NewClient(cookie, ""), AccountID: account, Username: os.Getenv("TIKTOK_EXPECTED_USERNAME"), StickerSource: source}
+		api = &gw.TikTok{Client: tt.NewClient(cookie, ""), AccountID: account, Username: os.Getenv("TIKTOK_EXPECTED_USERNAME"), Catalog: s}
 	} else {
 		return errors.New("TIKTOK_MODE must be live or mock")
 	}

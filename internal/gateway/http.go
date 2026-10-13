@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -172,10 +173,45 @@ func (e *Engine) Handler(token string) http.Handler {
 		}
 		reply(w, 200, map[string]bool{"paused": false})
 	})
+	mux.HandleFunc("POST /v1/stickers/import", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			SourceUserID string `json:"sourceUserId"`
+			MessageID    string `json:"messageId"`
+			Name         string `json:"name"`
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 4096)
+		d := json.NewDecoder(r.Body)
+		d.DisallowUnknownFields()
+		if d.Decode(&body) != nil || d.Decode(new(any)) != io.EOF || !numeric(body.SourceUserID) || !numeric(body.MessageID) || strings.TrimSpace(body.Name) == "" || len(body.Name) > 120 {
+			problem(w, 400, "invalid_sticker_import")
+			return
+		}
+		api, ok := e.API.(interface {
+			ImportSticker(context.Context, string, string, string) (Sticker, error)
+		})
+		if !ok {
+			problem(w, 501, "sticker_import_unavailable")
+			return
+		}
+		v, err := api.ImportSticker(r.Context(), body.SourceUserID, body.MessageID, body.Name)
+		if errors.Is(err, ErrConflict) {
+			problem(w, 409, "sticker_id_conflict")
+			return
+		}
+		if errors.Is(err, ErrNotFound) || errors.Is(err, ErrConversationNotFound) {
+			problem(w, 404, "sticker_not_found")
+			return
+		}
+		if err != nil {
+			problem(w, 503, "sticker_import_failed")
+			return
+		}
+		reply(w, 200, v)
+	})
 	mux.HandleFunc("GET /v1/stickers", func(w http.ResponseWriter, r *http.Request) {
 		v, err := e.API.Stickers(r.Context())
 		if err != nil {
-			problem(w, 503, "sticker_source_unavailable")
+			problem(w, 503, "sticker_catalog_unavailable")
 			return
 		}
 		reply(w, 200, map[string]any{"stickers": v})

@@ -1,6 +1,6 @@
 services:
   tiktok-gateway:
-    image: ${TIKTOK_GATEWAY_IMAGE:-ghcr.io/tiktok-gateway/tiktok-gateway:0.2.3}
+    image: ${TIKTOK_GATEWAY_IMAGE:-ghcr.io/tiktok-gateway/tiktok-gateway:0.3.0}
     restart: unless-stopped
     init: true
     stop_grace_period: 60s
@@ -10,7 +10,6 @@ services:
       DATA_DIR: /data
       TIKTOK_ACCOUNT_ID: ${TIKTOK_ACCOUNT_ID:?Set numeric account ID}
       TIKTOK_EXPECTED_USERNAME: ${TIKTOK_EXPECTED_USERNAME:-}
-      STICKER_SOURCE_USER_ID: ${STICKER_SOURCE_USER_ID:-}
       TIKTOK_COOKIE_FILE: /run/secrets/tiktok_cookie
       API_TOKEN_FILE: /run/secrets/api_token
       WEBHOOK_URL: ${WEBHOOK_URL:-}

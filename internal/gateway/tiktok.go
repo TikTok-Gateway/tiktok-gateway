@@ -16,12 +16,13 @@ import (
 
 // Reuse the existing protocol implementation; serialize its mutable session and sticker cache.
 type TikTok struct {
-	mu                                 sync.Mutex
-	Client                             *tt.Client
-	AccountID, Username, StickerSource string
-	adapter                            *g.TikTok
-	historyRoutes                      map[string]tt.Conversation
-	historyRoutesAt                    time.Time
+	mu                  sync.Mutex
+	Client              *tt.Client
+	AccountID, Username string
+	Catalog             *Store
+	adapter             *g.TikTok
+	historyRoutes       map[string]tt.Conversation
+	historyRoutesAt     time.Time
 }
 
 func (t *TikTok) base() *g.TikTok {
@@ -54,22 +55,22 @@ func (t *TikTok) Prepare(ctx context.Context, id string) (g.Conversation, error)
 	defer t.mu.Unlock()
 	return t.base().Prepare(ctx, id)
 }
-func (t *TikTok) source(ctx context.Context) (*tt.Conversation, error) {
-	if t.StickerSource == "" {
-		return nil, errors.New("sticker_source_not_configured")
-	}
-	return t.Client.PrepareDirectConversation(ctx, t.AccountID, t.StickerSource)
-}
 func (t *TikTok) ReadyStickerID(ctx context.Context, id string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	c, err := t.source(ctx)
+	if t.Catalog == nil {
+		return errors.New("catalog_unavailable")
+	}
+	v, err := t.Catalog.CatalogSticker(id)
 	if err != nil {
 		return err
 	}
-	// A new adapter deliberately bypasses the legacy 30-minute cache: selected source must still exist.
-	t.adapter = &g.TikTok{Client: t.Client, State: &g.State{SelfID: t.AccountID, StickerConversation: g.Conversation{ID: c.ID, Source: c.SourceID}}}
-	return t.adapter.ReadyStickerID(ctx, id)
+	sticker, err := tt.NewSticker(tt.Message{MessageSubtype: "sticker", RawAttachment: v.Attachment})
+	if err != nil {
+		return err
+	}
+	t.base().SetSticker(sticker)
+	return nil
 }
 func (t *TikTok) Send(ctx context.Context, c g.Conversation, kind, text string) (string, error) {
 	t.mu.Lock()
@@ -98,44 +99,20 @@ func (t *TikTok) Verify(ctx context.Context, o Operation) (bool, error) {
 	}
 	return false, nil
 }
-func (t *TikTok) choices(ctx context.Context) ([]g.StickerChoice, error) {
-	c, err := t.source(ctx)
-	if err != nil {
-		return nil, err
-	}
-	a := &g.TikTok{Client: t.Client, State: &g.State{SelfID: t.AccountID, StickerConversation: g.Conversation{ID: c.ID, Source: c.SourceID}}}
-	return a.StickerChoices(ctx)
-}
 func (t *TikTok) Stickers(ctx context.Context) ([]Sticker, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	choices, err := t.choices(ctx)
-	if err != nil {
-		return nil, err
+	if t.Catalog == nil {
+		return nil, errors.New("catalog_unavailable")
 	}
-	out := []Sticker{}
-	for _, s := range choices {
-		out = append(out, Sticker{s.ID, "/v1/stickers/" + s.ID + "/preview"})
-	}
-	return out, nil
+	return t.Catalog.CatalogStickers()
 }
 func (t *TikTok) Preview(ctx context.Context, id string) ([]byte, string, error) {
-	t.mu.Lock()
-	choices, err := t.choices(ctx)
-	t.mu.Unlock()
-	if err != nil {
-		return nil, "", err
+	if t.Catalog == nil {
+		return nil, "", errors.New("catalog_unavailable")
 	}
-	media := ""
-	for _, s := range choices {
-		if s.ID == id {
-			media = s.URL
-			break
-		}
-	}
-	if media == "" {
-		return nil, "", ErrNotFound
-	}
+	v, err := t.Catalog.CatalogSticker(id)
+	return v.Media, v.MIME, err
+}
+func downloadSticker(ctx context.Context, media string) ([]byte, string, error) {
 	u, err := url.Parse(media)
 	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" {
 		return nil, "", errors.New("invalid_media_url")
