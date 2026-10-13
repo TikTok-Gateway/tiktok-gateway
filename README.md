@@ -154,6 +154,10 @@ docker compose -f compose.yaml -f compose.n8n.yaml up -d
 API — на http://localhost:8080. На новом volume отправки остаются на паузе до
 осознанного `resume`. Установите пакет через Community Nodes после первого запуска.
 
+Для триггера Events задайте в `.env`
+`WEBHOOK_URL=http://n8n:5678/webhook/tiktok-events-gateway` и `RECEIVE_MESSAGES=true`.
+Без переопределения `WEBHOOK_URL` используется путь триггера New Follower.
+
 [Настройка, обновление и ограничения](docs/N8N.md).
 
 Получайте `userId` из `follower.created.data.userId` или доверенного источника

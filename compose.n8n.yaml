@@ -2,7 +2,7 @@
 services:
   tiktok-gateway:
     environment:
-      WEBHOOK_URL: http://n8n:5678/webhook/tiktok-follower-gateway
+      WEBHOOK_URL: ${WEBHOOK_URL:-http://n8n:5678/webhook/tiktok-follower-gateway}
     depends_on:
       n8n:
         condition: service_healthy
