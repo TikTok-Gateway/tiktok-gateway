@@ -25,14 +25,16 @@ type API interface {
 	Preview(context.Context, string) ([]byte, string, error)
 }
 type Engine struct {
-	Store       *Store
-	API         API
-	gate        sync.Mutex // pause/resume and durable dispatch boundary
-	work        sync.Mutex // one send or reconciliation at a time
-	statusMu    sync.RWMutex
-	connected   bool
-	pollError   string
-	VerifyDelay time.Duration
+	Store            *Store
+	API              API
+	gate             sync.Mutex // pause/resume and durable dispatch boundary
+	work             sync.Mutex // one send or reconciliation at a time
+	statusMu         sync.RWMutex
+	connected        bool
+	pollError        string
+	VerifyDelay      time.Duration
+	incomingMu       sync.Mutex
+	messagePollError string
 }
 
 func (e *Engine) Connection() (bool, string) {

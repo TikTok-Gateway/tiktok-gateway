@@ -9,8 +9,8 @@
 
 ## Запуск
 
-Публичный image: `ghcr.io/timnekk/tiktok-gateway`. Используйте версию `0.1.0`
-или digest (`ghcr.io/timnekk/tiktok-gateway@sha256:…`). `main` и `sha-<полный SHA>` —
+Публичный image: `ghcr.io/tiktok-gateway/tiktok-gateway`. Используйте версию `0.2.0`
+или digest (`ghcr.io/tiktok-gateway/tiktok-gateway@sha256:…`). `main` и `sha-<полный SHA>` —
 сборки разработки; `latest` указывает на стабильный релиз. Автообновления нет.
 
 1. Скопируйте `compose.yaml`. Создайте отдельный каталог secrets вне Git.
@@ -202,3 +202,13 @@ CI: PR — тесты, smoke и multiarch build без публикации; mai
 
 Сторонний клиент: [MIT license](third_party/matrix-tiktok/LICENSE).
 Входящие сообщения, `message.received`, AI — вне этой версии.
+
+### Incoming messages and history
+
+The gateway now supports opt-in `message.received` webhooks (`RECEIVE_MESSAGES=true`)
+and read-only `GET /v1/conversations/{userId}/messages?cursor=...`. First enablement
+baselines existing messages without replay. History is paginated; callers must
+check `exhausted` and `hasGaps` before inferring an opening message. No dialog
+stages or reply decisions are stored in gateway. See [n8n setup](docs/N8N.md#входящие-сообщения-и-история)
+and [OpenAPI](docs/openapi.json). Do not enable incoming delivery with the legacy
+follower-only receiver: use the new Events trigger and its production URL.

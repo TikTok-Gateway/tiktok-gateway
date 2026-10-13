@@ -703,22 +703,30 @@ func parseGetByConversationResponse(ctx context.Context, c *Client, body []byte)
 // oldest message in the last batch).
 // Returns the messages and the next-page cursor (empty string when exhausted).
 func (c *Client) GetMessages(ctx context.Context, conv *Conversation, cursor string) ([]Message, string, error) {
+	body, err := c.fetchMessages(ctx, conv, cursor)
+	if err != nil {
+		return nil, "", err
+	}
+	return parseGetByConversationResponse(ctx, c, body)
+}
+
+func (c *Client) fetchMessages(ctx context.Context, conv *Conversation, cursor string) ([]byte, error) {
 	log := zerolog.Ctx(ctx).With().Str("component", "libtiktok-messages").Logger()
 	ctx = log.WithContext(ctx)
 	cookie := c.rIA.Header.Get("Cookie")
 
 	universalData, err := c.getMessagesUniversalDataContext(ctx)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get universal data: %w", err)
+		return nil, fmt.Errorf("failed to get universal data: %w", err)
 	}
 
 	appContext, err := universalData.getAppContext()
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get appContext: %w", err)
+		return nil, fmt.Errorf("failed to get appContext: %w", err)
 	}
 	deviceID, ok := appContext["wid"].(string)
 	if !ok {
-		return nil, "", fmt.Errorf("failed to access wid from appContext")
+		return nil, fmt.Errorf("failed to access wid from appContext")
 	}
 
 	msToken := extractCookie(cookie, "msToken")
@@ -728,13 +736,13 @@ func (c *Client) GetMessages(ctx context.Context, conv *Conversation, cursor str
 	if cursor != "" {
 		cursorTsUs, err = strconv.ParseUint(cursor, 10, 64)
 		if err != nil {
-			return nil, "", fmt.Errorf("parse cursor %q: %w", cursor, err)
+			return nil, fmt.Errorf("parse cursor %q: %w", cursor, err)
 		}
 	}
 
 	payload, err := buildGetByConversationPayload(deviceID, msToken, verifyFP, conv.ID, conv.SourceID, 20, cursorTsUs)
 	if err != nil {
-		return nil, "", fmt.Errorf("build get_by_conversation payload: %w", err)
+		return nil, fmt.Errorf("build get_by_conversation payload: %w", err)
 	}
 	log.Debug().
 		Str("conversation_id", conv.ID).
@@ -752,22 +760,13 @@ func (c *Client) GetMessages(ctx context.Context, conv *Conversation, cursor str
 		SetBody(payload).
 		Post(getByConvURL)
 	if err != nil {
-		return nil, "", fmt.Errorf("post get_by_conversation: %w", err)
+		return nil, fmt.Errorf("post get_by_conversation: %w", err)
 	}
 	if resp.IsError() {
-		return nil, "", fmt.Errorf("get_by_conversation API returned %d: %s", resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("get_by_conversation API returned %d: %s", resp.StatusCode(), resp.String())
 	}
 
-	messages, nextCursor, err := parseGetByConversationResponse(ctx, c, resp.Body())
-	if err != nil {
-		return nil, "", fmt.Errorf("parse get_by_conversation response: %w", err)
-	}
-	log.Debug().
-		Str("conversation_id", conv.ID).
-		Int("messages", len(messages)).
-		Str("next_cursor", nextCursor).
-		Msg("Fetched TikTok conversation history successfully")
-	return messages, nextCursor, nil
+	return resp.Body(), nil
 }
 
 // LatestMessageTimestampUs returns ConversationMessageEntry.timestamp_us (wire

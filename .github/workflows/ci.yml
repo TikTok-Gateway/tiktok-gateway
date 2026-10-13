@@ -44,7 +44,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/timnekk/tiktok-gateway
+          images: ghcr.io/tiktok-gateway/tiktok-gateway
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-,format=long

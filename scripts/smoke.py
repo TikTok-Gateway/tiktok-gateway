@@ -4,7 +4,7 @@ root=pathlib.Path(__file__).resolve().parents[1]
 def run(*args): return subprocess.check_output(args,text=True,stderr=subprocess.STDOUT).strip()
 with tempfile.TemporaryDirectory(prefix='tiktok-gateway-smoke-') as directory:
     d=pathlib.Path(directory); d.chmod(0o755); token=secrets.token_hex(24); hook=secrets.token_hex(24)
-    for name,value in [('api',token),('hook',hook),('events.json','[]')]:
+    for name,value in [('api',token),('hook',hook),('events.json','[]'),('messages.json','{}')]:
         (d/name).write_text(value);(d/name).chmod(0o444)
     (d/'receiver.py').write_text('''from http.server import BaseHTTPRequestHandler,HTTPServer
 import json,os
@@ -20,7 +20,7 @@ class Handler(BaseHTTPRequestHandler):
   self.send_response(503 if len(received)<3 else 204);self.end_headers()
 HTTPServer(('0.0.0.0',8080),Handler).serve_forever()
 ''')
-    spec={'services':{'tiktok-gateway':{'image':os.environ.get('GATEWAY_TEST_IMAGE','tiktok-gateway:smoke'),'environment':{'TIKTOK_MODE':'mock','TIKTOK_ACCOUNT_ID':'100','API_TOKEN_FILE':'/fixture/api','WEBHOOK_TOKEN_FILE':'/fixture/hook','WEBHOOK_URL':'http://receiver:8080/','MOCK_EVENTS_FILE':'/fixture/events.json','POLL_SECONDS':'1'},'volumes':['data:/data',str(d)+':/fixture:ro'],'ports':['127.0.0.1::8080'],'read_only':True,'cap_drop':['ALL'],'security_opt':['no-new-privileges:true']},'receiver':{'image':'python:3.13-alpine','command':['python','/fixture/receiver.py'],'volumes':[str(d)+':/fixture:ro'],'ports':['127.0.0.1::8080']}},'volumes':{'data':{}}}
+    spec={'services':{'tiktok-gateway':{'image':os.environ.get('GATEWAY_TEST_IMAGE','tiktok-gateway:smoke'),'environment':{'TIKTOK_MODE':'mock','TIKTOK_ACCOUNT_ID':'100','API_TOKEN_FILE':'/fixture/api','WEBHOOK_TOKEN_FILE':'/fixture/hook','WEBHOOK_URL':'http://receiver:8080/','MOCK_EVENTS_FILE':'/fixture/events.json','MOCK_MESSAGES_FILE':'/fixture/messages.json','RECEIVE_MESSAGES':'true','POLL_SECONDS':'1'},'volumes':['data:/data',str(d)+':/fixture:ro'],'ports':['127.0.0.1::8080'],'read_only':True,'cap_drop':['ALL'],'security_opt':['no-new-privileges:true']},'receiver':{'image':'python:3.13-alpine','command':['python','/fixture/receiver.py'],'volumes':[str(d)+':/fixture:ro'],'ports':['127.0.0.1::8080']}},'volumes':{'data':{}}}
     (d/'compose.json').write_text(json.dumps(spec));project='tiktok-gateway-smoke-'+secrets.token_hex(4)
     base=['docker','compose','-p',project,'-f',str(d/'compose.json')]
     def compose(*args):return run(*base,*args)
@@ -63,11 +63,26 @@ HTTPServer(('0.0.0.0',8080),Handler).serve_forever()
         assert len({row['eventId'] for row in received})==1
         until(lambda:request(url,'/v1/status')['webhook']['pending']==0)
         assert request(url,'/v1/status')['paused']
+        # Real gateway transport + history API, backed only by synthetic fixture data.
+        from datetime import datetime, timezone
+        sent_at=datetime.now(timezone.utc).isoformat().replace('+00:00','Z')
+        message={'messageId':'30','senderId':'200','direction':'incoming','type':'text','text':'synthetic incoming','sentAt':sent_at}
+        page={'accountId':'100','userId':'200','conversationId':'0:1:100:200','messages':[message],'nextCursor':'10','exhausted':False,'hasGaps':False}
+        empty={**page,'messages':[],'nextCursor':'','exhausted':True}
+        fixture={'conversations':[{'userId':'200','conversationId':'0:1:100:200'}],'pages':{'200':{'':page,'10':empty}}}
+        (d/'messages-next.json').write_text(json.dumps(fixture));(d/'messages-next.json').chmod(0o444);(d/'messages-next.json').replace(d/'messages.json')
+        until(lambda:request(url,'/v1/conversations/200/messages')['messages'][0]['messageId']=='30')
+        assert request(url,'/v1/conversations/200/messages?cursor=10')['exhausted']
+        incoming=until(lambda:[row for row in request(receiver,'/') if row['type']=='message.received'])
+        assert len(incoming)==1 and incoming[0]['data']['messageId']=='30'
+        until(lambda:request(url,'/v1/status')['webhook']['pending']==0)
         logs=compose('logs');assert token not in logs and hook not in logs and cmd['text'] not in logs
         compose('up','-d','--force-recreate','tiktok-gateway');url=port('tiktok-gateway');until(lambda:request(url,'/readyz'))
         assert request(url,'/v1/status')['paused']
         assert request(url,'/v1/operations/'+first['operationId'])['state']=='succeeded'
         assert request(url,'/v1/status')['webhook']['pending']==0
-        print('PASS: Compose mock, idempotency, text + sticker, pause, webhook retries, recreation persistence, secret-free logs')
+        time.sleep(3)
+        assert len([row for row in request(receiver,'/') if row['type']=='message.received'])==1
+        print('PASS: message history, incoming webhook and restart dedup; Compose mock, idempotency, text + sticker, pause, webhook retries, recreation persistence, secret-free logs')
     finally:
         compose('down','-v','--remove-orphans')

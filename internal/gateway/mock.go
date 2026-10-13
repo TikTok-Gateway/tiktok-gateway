@@ -10,7 +10,40 @@ import (
 )
 
 // Mock never contacts TikTok. Optional fixture files let isolated smoke tests inject followers.
-type Mock struct{ EventsFile string }
+type Mock struct{ EventsFile, MessagesFile string }
+
+type mockMessages struct {
+	Conversations []DirectConversation              `json:"conversations"`
+	Pages         map[string]map[string]MessagePage `json:"pages"`
+}
+
+func (m *Mock) readMessages() (mockMessages, error) {
+	var fixture mockMessages
+	if m.MessagesFile == "" {
+		return fixture, nil
+	}
+	b, err := os.ReadFile(m.MessagesFile)
+	if err != nil {
+		return fixture, err
+	}
+	err = json.Unmarshal(b, &fixture)
+	return fixture, err
+}
+func (m *Mock) Conversations(context.Context) ([]DirectConversation, error) {
+	fixture, err := m.readMessages()
+	return fixture.Conversations, err
+}
+func (m *Mock) Messages(_ context.Context, user, cursor string) (MessagePage, error) {
+	fixture, err := m.readMessages()
+	if err != nil {
+		return MessagePage{}, err
+	}
+	page, ok := fixture.Pages[user][cursor]
+	if !ok {
+		return MessagePage{}, ErrConversationNotFound
+	}
+	return page, nil
+}
 
 func (m *Mock) Check(context.Context) error { return nil }
 func (m *Mock) Events(context.Context, time.Time) ([]g.Event, error) {

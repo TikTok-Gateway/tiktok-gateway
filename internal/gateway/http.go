@@ -64,8 +64,35 @@ func (e *Engine) Handler(token string) http.Handler {
 			problem(w, 503, "storage_unavailable")
 			return
 		}
+		incoming, err := e.IncomingStatus()
+		if err != nil {
+			problem(w, 503, "storage_unavailable")
+			return
+		}
 		connected, pollErr := e.Connection()
-		reply(w, 200, map[string]any{"accountId": m.AccountID, "connected": connected, "paused": m.Paused != "", "pauseReason": m.Paused, "queue": counts, "lastPollAt": m.LastPoll, "pollError": pollErr, "webhook": webhook})
+		reply(w, 200, map[string]any{"accountId": m.AccountID, "connected": connected, "paused": m.Paused != "", "pauseReason": m.Paused, "queue": counts, "lastPollAt": m.LastPoll, "pollError": pollErr, "webhook": webhook, "incoming": incoming})
+	})
+	mux.HandleFunc("GET /v1/conversations/{userId}/messages", func(w http.ResponseWriter, r *http.Request) {
+		user, cursor := r.PathValue("userId"), r.URL.Query().Get("cursor")
+		if !numeric(user) || (cursor != "" && !numeric(cursor)) {
+			problem(w, 400, "invalid_history_query")
+			return
+		}
+		api, ok := e.API.(MessagingAPI)
+		if !ok {
+			problem(w, 503, "messages_not_supported")
+			return
+		}
+		page, err := api.Messages(r.Context(), user, cursor)
+		if errors.Is(err, ErrConversationNotFound) {
+			problem(w, 404, "conversation_not_found")
+			return
+		}
+		if err != nil {
+			problem(w, 503, "history_unavailable")
+			return
+		}
+		reply(w, 200, page)
 	})
 	mux.HandleFunc("POST /v1/messages", func(w http.ResponseWriter, r *http.Request) {
 		key := r.Header.Get("Idempotency-Key")

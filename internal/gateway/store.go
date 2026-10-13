@@ -67,8 +67,11 @@ type Event struct {
 	Data          EventData `json:"data"`
 }
 type EventData struct {
-	UserID   string `json:"userId"`
-	Username string `json:"username,omitempty"`
+	UserID         string   `json:"userId"`
+	Username       string   `json:"username,omitempty"`
+	ConversationID string   `json:"conversationId,omitempty"`
+	MessageID      string   `json:"messageId,omitempty"`
+	Message        *Message `json:"message,omitempty"`
 }
 type Store struct {
 	db   *sql.DB
@@ -102,6 +105,7 @@ func Open(path, account string) (*Store, error) {
  CREATE TABLE IF NOT EXISTS seen (id TEXT PRIMARY KEY);
  CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, body BLOB NOT NULL);
  CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY REFERENCES events(id), attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL DEFAULT 0, delivered INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '');
+ CREATE TABLE IF NOT EXISTS message_sync (id INTEGER PRIMARY KEY CHECK(id=1), started TEXT NOT NULL, last_poll TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS imports (digest TEXT PRIMARY KEY);
  CREATE TABLE IF NOT EXISTS legacy_jobs (id TEXT PRIMARY KEY, body BLOB NOT NULL);
  PRAGMA user_version=1;`)
@@ -312,7 +316,7 @@ func (s *Store) Ingest(events []g.Event, at time.Time) error {
 			continue
 		}
 		id := hash([]byte(m.AccountID + ":" + v.ID))
-		ev := Event{"1", id, "follower.created", m.AccountID, time.Unix(v.Created, 0).UTC(), at, EventData{v.UserID, v.Username}}
+		ev := Event{"1", id, "follower.created", m.AccountID, time.Unix(v.Created, 0).UTC(), at, EventData{UserID: v.UserID, Username: v.Username}}
 		b, _ := json.Marshal(ev)
 		if _, err = tx.Exec(`INSERT INTO events VALUES(?,?)`, id, b); err != nil {
 			return err

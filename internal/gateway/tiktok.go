@@ -20,6 +20,8 @@ type TikTok struct {
 	Client                             *tt.Client
 	AccountID, Username, StickerSource string
 	adapter                            *g.TikTok
+	historyRoutes                      map[string]tt.Conversation
+	historyRoutesAt                    time.Time
 }
 
 func (t *TikTok) base() *g.TikTok {

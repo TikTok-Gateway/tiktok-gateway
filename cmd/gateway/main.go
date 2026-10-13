@@ -116,7 +116,7 @@ func run() error {
 	}
 	var api gw.API
 	if os.Getenv("TIKTOK_MODE") == "mock" {
-		api = &gw.Mock{EventsFile: os.Getenv("MOCK_EVENTS_FILE")}
+		api = &gw.Mock{EventsFile: os.Getenv("MOCK_EVENTS_FILE"), MessagesFile: os.Getenv("MOCK_MESSAGES_FILE")}
 	} else if mode := os.Getenv("TIKTOK_MODE"); mode == "" || mode == "live" {
 		cookie, e := secret("TIKTOK_COOKIE_FILE")
 		if e != nil {
@@ -139,6 +139,10 @@ func run() error {
 	}
 	if os.Getenv("TIKTOK_MODE") != "mock" && poll < 30 {
 		return errors.New("live POLL_SECONDS must be at least 30")
+	}
+	receiveMessages := env("RECEIVE_MESSAGES", "false")
+	if receiveMessages != "true" && receiveMessages != "false" {
+		return errors.New("RECEIVE_MESSAGES must be true or false")
 	}
 	if err = s.Recover(); err != nil {
 		return errors.New("database_recovery_failed")
@@ -172,6 +176,10 @@ func run() error {
 		}()
 	}
 	start(time.Duration(poll)*time.Second, e.Poll)
+	// Opt in after configuring a receiver that supports message.received.
+	if receiveMessages == "true" {
+		start(time.Duration(poll)*time.Second, e.PollMessages)
+	}
 	start(time.Second, e.Work)
 	start(time.Second, hook.Deliver)
 	server := &http.Server{Addr: env("LISTEN_ADDR", ":8080"), Handler: e.Handler(token), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 180 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384, BaseContext: func(_ net.Listener) context.Context { return ctx }}

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TikTok Gateway",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "One account per service. Durable idempotency, conservative reconciliation, at-least-once webhooks. No exactly-once guarantee."
   },
   "servers": [
@@ -123,6 +123,22 @@
                           "type": "integer"
                         },
                         "lastError": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "incoming": {
+                      "type": "object",
+                      "properties": {
+                        "startedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastPollAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "error": {
                           "type": "string"
                         }
                       }
@@ -607,6 +623,86 @@
           }
         }
       }
+    },
+    "/v1/conversations/{userId}/messages": {
+      "get": {
+        "summary": "Read one page of existing direct-conversation history; no creation or mark-read",
+        "operationId": "get__v1_conversations_userId_messages",
+        "responses": {
+          "200": {
+            "description": "Read one page of existing direct-conversation history; no creation or mark-read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid user ID or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found in available inbox; not proof of no prior history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "description": "Numeric ID encoded as a string; never a JSON number."
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "description": "Numeric ID encoded as a string; never a JSON number."
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -792,6 +888,163 @@
             }
           }
         }
+      },
+      "HistoryMessage": {
+        "type": "object",
+        "required": [
+          "messageId",
+          "senderId",
+          "direction",
+          "type",
+          "text",
+          "sentAt"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Numeric ID encoded as a string; never a JSON number."
+          },
+          "senderId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Numeric ID encoded as a string; never a JSON number."
+          },
+          "direction": {
+            "enum": [
+              "incoming",
+              "outgoing"
+            ]
+          },
+          "type": {
+            "enum": [
+              "text",
+              "image",
+              "video",
+              "sticker",
+              "unknown"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "replyToMessageId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Numeric ID encoded as a string; never a JSON number."
+          }
+        }
+      },
+      "MessagePage": {
+        "type": "object",
+        "required": [
+          "accountId",
+          "userId",
+          "conversationId",
+          "messages",
+          "nextCursor",
+          "exhausted",
+          "hasGaps"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Numeric ID encoded as a string; never a JSON number."
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Numeric ID encoded as a string; never a JSON number."
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryMessage"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "exhausted": {
+            "type": "boolean",
+            "description": "Explicit empty server page. Proves only the end of currently visible history."
+          },
+          "hasGaps": {
+            "type": "boolean",
+            "description": "Hidden, recalled or unparseable rows were observed on this page."
+          }
+        }
+      },
+      "MessageReceived": {
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "eventId",
+          "type",
+          "accountId",
+          "occurredAt",
+          "detectedAt",
+          "data"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": "1"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "type": {
+            "const": "message.received"
+          },
+          "accountId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Numeric ID encoded as a string; never a JSON number."
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "userId",
+              "conversationId",
+              "messageId",
+              "message"
+            ],
+            "properties": {
+              "userId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "Numeric ID encoded as a string; never a JSON number."
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "messageId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "Numeric ID encoded as a string; never a JSON number."
+              },
+              "message": {
+                "$ref": "#/components/schemas/HistoryMessage"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -805,6 +1058,26 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/FollowerCreated"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Accepted; workflow may still be running"
+          }
+        }
+      }
+    },
+    "message.received": {
+      "post": {
+        "description": "Opt-in RECEIVE_MESSAGES=true. First poll establishes baseline. Stable event ID, incoming DMs only. Same webhook URL/token as followers; no business-state storage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageReceived"
               }
             }
           }
