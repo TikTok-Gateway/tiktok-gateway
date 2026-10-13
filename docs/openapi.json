@@ -699,6 +699,24 @@
           "reason": {
             "type": "string"
           },
+          "tiktokRejection": {
+            "type": "object",
+            "description": "Numerical TikTok rejection diagnostics, when available. Older operations may omit this field.",
+            "required": [
+              "status",
+              "check"
+            ],
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "check": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
           "messageId": {
             "type": "string"
           },

@@ -112,6 +112,14 @@ func (e *Engine) finish(o Operation, state, reason, pause string) error {
 	o.Reason = reason
 	return e.Store.Save(o, pause)
 }
+func rejectionCodes(err error) *TikTokRejection {
+	var rejection *g.APIRejection
+	if errors.As(err, &rejection) {
+		return &TikTokRejection{Status: rejection.Status, Check: rejection.Check}
+	}
+	return nil
+}
+
 func (e *Engine) Work(ctx context.Context) error {
 	e.work.Lock()
 	defer e.work.Unlock()
@@ -142,6 +150,7 @@ func (e *Engine) Work(ctx context.Context) error {
 	}
 	o.Conversation, err = e.API.Prepare(ctx, o.Command.RecipientUserID)
 	if err != nil {
+		o.TikTokRejection = rejectionCodes(err)
 		if errors.Is(err, g.ErrRecipientUnavailable) {
 			return e.finish(o, "failed", "recipient_unavailable", "")
 		}
@@ -169,6 +178,7 @@ func (e *Engine) Work(ctx context.Context) error {
 	}
 	id, sendErr := e.API.Send(ctx, o.Conversation, o.Command.Type, o.Command.Text)
 	if sendErr != nil || id == "" {
+		o.TikTokRejection = rejectionCodes(sendErr)
 		if errors.Is(sendErr, g.ErrRecipientUnavailable) {
 			return e.finish(o, "failed", "recipient_unavailable", "")
 		}

@@ -27,15 +27,23 @@ type Command struct {
 	Text            string `json:"text,omitempty"`
 	StickerID       string `json:"stickerId,omitempty"`
 }
+
+// TikTokRejection retains only numerical diagnostics, never raw API responses.
+type TikTokRejection struct {
+	Status uint64 `json:"status"`
+	Check  uint64 `json:"check"`
+}
+
 type Operation struct {
-	ID           string         `json:"operationId"`
-	Command      Command        `json:"command"`
-	State        string         `json:"state"`
-	Reason       string         `json:"reason,omitempty"`
-	MessageID    string         `json:"messageId,omitempty"`
-	Conversation g.Conversation `json:"-"`
-	CreatedAt    time.Time      `json:"createdAt"`
-	UpdatedAt    time.Time      `json:"updatedAt"`
+	TikTokRejection *TikTokRejection `json:"tiktokRejection,omitempty"`
+	ID              string           `json:"operationId"`
+	Command         Command          `json:"command"`
+	State           string           `json:"state"`
+	Reason          string           `json:"reason,omitempty"`
+	MessageID       string           `json:"messageId,omitempty"`
+	Conversation    g.Conversation   `json:"-"`
+	CreatedAt       time.Time        `json:"createdAt"`
+	UpdatedAt       time.Time        `json:"updatedAt"`
 }
 
 // Private persistence envelope keeps conversation routing out of HTTP responses.
