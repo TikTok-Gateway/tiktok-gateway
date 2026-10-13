@@ -97,40 +97,42 @@ func TestOperationWithoutRejectionRemainsCompatible(t *testing.T) {
 }
 
 func TestRecipientRejectionDoesNotStopOtherRecipient(t *testing.T) {
-	for _, stage := range []string{"send", "prepare"} {
-		t.Run(stage, func(t *testing.T) {
-			s, e, f := setup(t)
-			denied := &g.APIRejection{Status: 3, Check: 2, BusinessCode: 7202, Cause: g.ErrRecipientUnavailable}
-			if stage == "send" {
-				f.sendErr = denied
-			} else {
-				f.prepareErr = denied
-			}
-			first, err := s.Enqueue("unavailable-recipient", command())
-			must(t, err)
-			must(t, e.Work(context.Background()))
-			got, err := s.Get(first.ID)
-			must(t, err)
-			if got.State != "failed" || got.Reason != "recipient_unavailable" || got.TikTokRejection.BusinessCode != 7202 {
-				t.Fatal(got)
-			}
-			f.sendErr = nil
-			f.prepareErr = nil
-			next := command()
-			next.RecipientUserID = "300"
-			second, err := s.Enqueue("another-recipient", next)
-			must(t, err)
-			must(t, e.Work(context.Background()))
-			got, err = s.Get(second.ID)
-			must(t, err)
-			if got.State != "succeeded" {
-				t.Fatal("other recipient blocked", got)
-			}
-			duplicate, err := s.Enqueue("unavailable-recipient", command())
-			must(t, err)
-			if duplicate.ID != first.ID || duplicate.State != "failed" {
-				t.Fatal("failed send retried")
-			}
-		})
+	for _, code := range []uint64{7202, 7409} {
+		for _, stage := range []string{"send", "prepare"} {
+			t.Run(fmt.Sprintf("%s/%d", stage, code), func(t *testing.T) {
+				s, e, f := setup(t)
+				denied := &g.APIRejection{Status: 3, Check: 2, BusinessCode: code, Cause: g.ErrRecipientUnavailable}
+				if stage == "send" {
+					f.sendErr = denied
+				} else {
+					f.prepareErr = denied
+				}
+				first, err := s.Enqueue("unavailable-recipient", command())
+				must(t, err)
+				must(t, e.Work(context.Background()))
+				got, err := s.Get(first.ID)
+				must(t, err)
+				if got.State != "failed" || got.Reason != "recipient_unavailable" || got.TikTokRejection.BusinessCode != code {
+					t.Fatal(got)
+				}
+				f.sendErr = nil
+				f.prepareErr = nil
+				next := command()
+				next.RecipientUserID = "300"
+				second, err := s.Enqueue("another-recipient", next)
+				must(t, err)
+				must(t, e.Work(context.Background()))
+				got, err = s.Get(second.ID)
+				must(t, err)
+				if got.State != "succeeded" {
+					t.Fatal("other recipient blocked", got)
+				}
+				duplicate, err := s.Enqueue("unavailable-recipient", command())
+				must(t, err)
+				if duplicate.ID != first.ID || duplicate.State != "failed" {
+					t.Fatal("failed send retried")
+				}
+			})
+		}
 	}
 }

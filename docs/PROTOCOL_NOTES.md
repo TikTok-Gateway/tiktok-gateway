@@ -62,6 +62,12 @@ as recipient-unavailable; its exact privacy/eligibility cause is not documented.
 This is an observed mapping, not a published TikTok contract. Generic status or
 check values of 7202 are not used for that classification.
 
+A separate controlled retry on the same date returned businessCode=7409 for
+another recipient. The operator confirmed the same inability to message that
+recipient directly in TikTok. Detailed code 7409 is also recipient-scoped under
+this observed mapping. Its precise privacy/eligibility cause remains unknown;
+generic status/check values of 7409 and explicit sender restrictions still pause.
+
 Read-only preflight comparison of this recipient and a working test recipient
 returned identical relevant profile flags: follower_status=1, follow_status=0,
 block=false, blocked_by=false, deleted=0. No send-permission field was exposed.
