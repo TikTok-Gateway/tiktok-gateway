@@ -100,7 +100,7 @@ func TestRecipientRejectionDoesNotStopOtherRecipient(t *testing.T) {
 	for _, stage := range []string{"send", "prepare"} {
 		t.Run(stage, func(t *testing.T) {
 			s, e, f := setup(t)
-			denied := &g.APIRejection{Status: 3, Check: 2, BusinessCode: 7283, Cause: g.ErrRecipientUnavailable}
+			denied := &g.APIRejection{Status: 3, Check: 2, BusinessCode: 7202, Cause: g.ErrRecipientUnavailable}
 			if stage == "send" {
 				f.sendErr = denied
 			} else {
@@ -111,7 +111,7 @@ func TestRecipientRejectionDoesNotStopOtherRecipient(t *testing.T) {
 			must(t, e.Work(context.Background()))
 			got, err := s.Get(first.ID)
 			must(t, err)
-			if got.State != "failed" || got.Reason != "recipient_unavailable" || got.TikTokRejection.BusinessCode != 7283 {
+			if got.State != "failed" || got.Reason != "recipient_unavailable" || got.TikTokRejection.BusinessCode != 7202 {
 				t.Fatal(got)
 			}
 			f.sendErr = nil

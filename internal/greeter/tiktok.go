@@ -235,6 +235,12 @@ func classifyDenied(e *tt.MessagingDenied) error {
 			cause = ErrRecipientUnavailable
 		}
 	}
+	// Observed with status=3/check=2 for a recipient whose TikTok UI disallows
+	// messaging (2026-10-14). Treat only the detailed code as recipient-scoped;
+	// this does not establish which privacy/eligibility setting caused it.
+	if e.BusinessCode == 7202 {
+		cause = ErrRecipientUnavailable
+	}
 	// A conflicting explicit sender restriction always wins.
 	for _, code := range []uint64{e.Status, e.Check, e.BusinessCode} {
 		switch code {

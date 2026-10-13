@@ -55,6 +55,24 @@ Recipient-specific business codes from TikTok web client module: 7281, 7282, 728
 such as 7284, 7289, 7393, generic blocks 7170, and unknown codes stop the daemon.
 Do not infer sender safety from a successful HTTP status.
 
+On 2026-10-14, a controlled retry returned status=3/check=2/businessCode=7202.
+The operator independently confirmed in TikTok that this recipient cannot be
+messaged despite following the sender. We classify this detailed business code
+as recipient-unavailable; its exact privacy/eligibility cause is not documented.
+This is an observed mapping, not a published TikTok contract. Generic status or
+check values of 7202 are not used for that classification.
+
+Read-only preflight comparison of this recipient and a working test recipient
+returned identical relevant profile flags: follower_status=1, follow_status=0,
+block=false, blocked_by=false, deleted=0. No send-permission field was exposed.
+The web client's chat-notice endpoint returned no distinguishing notice. A private
+profile alone is not proof that DMs are closed. Therefore the gateway continues
+to precheck explicit block/deleted flags, but cannot reliably skip every newly
+encountered privacy-restricted recipient before the first send rejection.
+Existing failed operation keys remain terminal; no retries or permanent recipient
+blacklist are introduced (permissions can change).
+
+
 The sticker template is the original owner's sticker message in the agreed test
 conversation. Only an attachment consisting of protobuf field 7 is accepted;
 no conversation or sender metadata is copied. Send awe type 1805, subtype sticker,

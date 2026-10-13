@@ -374,7 +374,7 @@ func TestDetailedRestrictionClassification(t *testing.T) {
 		code      uint64
 		recipient bool
 	}{
-		{7281, true}, {7282, true}, {7283, true}, {7290, true}, {7291, true}, {7394, true},
+		{7202, true}, {7281, true}, {7282, true}, {7283, true}, {7290, true}, {7291, true}, {7394, true},
 		{7284, false}, {7289, false}, {7393, false}, {7170, false}, {7195, false}, {7179, false}, {0, false}, {9999, false},
 	} {
 		err := classifyDenied(&tt.MessagingDenied{Status: 3, Check: 2, BusinessCode: v.code})
@@ -387,7 +387,7 @@ func TestDetailedRestrictionClassification(t *testing.T) {
 		}
 	}
 	for _, denial := range []*tt.MessagingDenied{
-		{Status: 7289, Check: 7283}, {Status: 7289, Check: 2, BusinessCode: 7283}, {Status: 3, Check: 7283, BusinessCode: 9999},
+		{Status: 7202}, {Check: 7202}, {Status: 7289, Check: 2, BusinessCode: 7202}, {Status: 7289, Check: 7283}, {Status: 7289, Check: 2, BusinessCode: 7283}, {Status: 3, Check: 7283, BusinessCode: 9999},
 	} {
 		if !errors.Is(classifyDenied(denial), ErrDenied) {
 			t.Fatal("conflicting or unknown restriction was ignored")
