@@ -28,7 +28,7 @@ func TestRejectionCodesSurviveRestartAndDuplicate(t *testing.T) {
 				if recipient {
 					cause, check, pause, reason = g.ErrRecipientUnavailable, 7281, "", "recipient_unavailable"
 				}
-				rejection := fmt.Errorf("private response must not be persisted: %w", &g.APIRejection{Status: 3, Check: check, Cause: cause})
+				rejection := fmt.Errorf("private response must not be persisted: %w", &g.APIRejection{Status: 3, Check: 2, BusinessCode: check, Cause: cause})
 				f := &fake{}
 				if stage == "send" {
 					f.sendErr = rejection
@@ -69,7 +69,7 @@ func TestRejectionCodesSurviveRestartAndDuplicate(t *testing.T) {
 				}
 				var got Operation
 				must(t, json.Unmarshal(response.Body.Bytes(), &got))
-				if got.TikTokRejection == nil || got.TikTokRejection.Status != 3 || got.TikTokRejection.Check != check {
+				if got.TikTokRejection == nil || got.TikTokRejection.Status != 3 || got.TikTokRejection.Check != 2 || got.TikTokRejection.BusinessCode != check {
 					t.Fatal(got)
 				}
 			})
@@ -93,5 +93,44 @@ func TestOperationWithoutRejectionRemainsCompatible(t *testing.T) {
 	must(t, err)
 	if string(b) != `{"status":0,"check":0}` {
 		t.Fatal(string(b))
+	}
+}
+
+func TestRecipientRejectionDoesNotStopOtherRecipient(t *testing.T) {
+	for _, stage := range []string{"send", "prepare"} {
+		t.Run(stage, func(t *testing.T) {
+			s, e, f := setup(t)
+			denied := &g.APIRejection{Status: 3, Check: 2, BusinessCode: 7283, Cause: g.ErrRecipientUnavailable}
+			if stage == "send" {
+				f.sendErr = denied
+			} else {
+				f.prepareErr = denied
+			}
+			first, err := s.Enqueue("unavailable-recipient", command())
+			must(t, err)
+			must(t, e.Work(context.Background()))
+			got, err := s.Get(first.ID)
+			must(t, err)
+			if got.State != "failed" || got.Reason != "recipient_unavailable" || got.TikTokRejection.BusinessCode != 7283 {
+				t.Fatal(got)
+			}
+			f.sendErr = nil
+			f.prepareErr = nil
+			next := command()
+			next.RecipientUserID = "300"
+			second, err := s.Enqueue("another-recipient", next)
+			must(t, err)
+			must(t, e.Work(context.Background()))
+			got, err = s.Get(second.ID)
+			must(t, err)
+			if got.State != "succeeded" {
+				t.Fatal("other recipient blocked", got)
+			}
+			duplicate, err := s.Enqueue("unavailable-recipient", command())
+			must(t, err)
+			if duplicate.ID != first.ID || duplicate.State != "failed" {
+				t.Fatal("failed send retried")
+			}
+		})
 	}
 }

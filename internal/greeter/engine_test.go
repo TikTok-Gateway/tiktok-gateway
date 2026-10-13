@@ -368,3 +368,29 @@ func TestCustomTextWithStickerAndDuplicateCheck(t *testing.T) {
 		}
 	}
 }
+
+func TestDetailedRestrictionClassification(t *testing.T) {
+	for _, v := range []struct {
+		code      uint64
+		recipient bool
+	}{
+		{7281, true}, {7282, true}, {7283, true}, {7290, true}, {7291, true}, {7394, true},
+		{7284, false}, {7289, false}, {7393, false}, {7170, false}, {7195, false}, {7179, false}, {0, false}, {9999, false},
+	} {
+		err := classifyDenied(&tt.MessagingDenied{Status: 3, Check: 2, BusinessCode: v.code})
+		if errors.Is(err, ErrRecipientUnavailable) != v.recipient || errors.Is(err, ErrDenied) == v.recipient {
+			t.Fatalf("wrong scope for %d: %v", v.code, err)
+		}
+		var detail *APIRejection
+		if !errors.As(err, &detail) || detail.BusinessCode != v.code || detail.Check != 2 || detail.Status != 3 {
+			t.Fatal("lost diagnostics")
+		}
+	}
+	for _, denial := range []*tt.MessagingDenied{
+		{Status: 7289, Check: 7283}, {Status: 7289, Check: 2, BusinessCode: 7283}, {Status: 3, Check: 7283, BusinessCode: 9999},
+	} {
+		if !errors.Is(classifyDenied(denial), ErrDenied) {
+			t.Fatal("conflicting or unknown restriction was ignored")
+		}
+	}
+}

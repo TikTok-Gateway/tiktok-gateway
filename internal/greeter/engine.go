@@ -222,7 +222,7 @@ func (e *Engine) send(ctx context.Context, j *Job, kind string) error {
 	if err != nil || id == "" {
 		var rejection *APIRejection
 		if errors.As(err, &rejection) {
-			j.Rejection = &Rejection{Status: rejection.Status, Check: rejection.Check}
+			j.Rejection = &Rejection{Status: rejection.Status, Check: rejection.Check, BusinessCode: rejection.BusinessCode}
 		}
 
 		if errors.Is(err, ErrRecipientUnavailable) {

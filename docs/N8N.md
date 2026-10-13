@@ -68,7 +68,7 @@ HTTPS и соответствующие публичные URL. Не запус�
 - **Send Text** и **Send Sticker** сохраняют данные события и item linking,
   продолжают workflow только после `succeeded`. Оставьте **Stop Workflow** при
   ошибке. Диагностика содержит `operationId`, `reason` и доступные
-  `tiktokRejection.status/check`; сырые HTTP-ошибки и токены скрыты.
+  `tiktokRejection.status/check` и необязательный `businessCode`; сырые HTTP-ошибки и токены скрыты.
 - Ключ — `eventId:actionKey`, а без явного action key —
   `eventId:workflowId:nodeId`. В примере используются `welcome-v1:text-1` и
   `welcome-v1:sticker-1`. Сохраняйте ID workflow/нод и ключи при Retry, повторной

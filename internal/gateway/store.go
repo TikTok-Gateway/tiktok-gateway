@@ -30,8 +30,9 @@ type Command struct {
 
 // TikTokRejection retains only numerical diagnostics, never raw API responses.
 type TikTokRejection struct {
-	Status uint64 `json:"status"`
-	Check  uint64 `json:"check"`
+	Status       uint64 `json:"status"`
+	Check        uint64 `json:"check"`
+	BusinessCode uint64 `json:"businessCode,omitempty"`
 }
 
 type Operation struct {

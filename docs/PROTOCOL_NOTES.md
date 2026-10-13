@@ -33,10 +33,24 @@ conversation has not been isolated as a controlled test.
 
 Send body format comes from the vendored library. Status decoding was corrected:
 outer status field 3, inner body field 6 -> 100, inner status 3, check_code 5,
-server_message_id 1. A nonzero status/check is a rejection even if an ID exists;
+server_message_id 1, check_message 6 (field 3 for create conversation).
+A nonzero status/check/business code is a rejection even if an ID exists;
 ID zero is never an acknowledgement. No automatic retries of message sends.
 
-Recipient-specific codes from TikTok web client module: 7281, 7282, 7283, 7290,
+The web UI reads the detailed business denial as `JSON.parse(checkMsg).status_code`,
+not the generic protobuf `check_code`. `SendMessageStatus=3` is
+`CHECK_MSG_NOT_PASS`; check=2 does not identify recipient versus sender scope.
+The adapter extracts only a positive integer `status_code` from bounded JSON and
+never retains the raw string. Missing/malformed details remain unknown; historical
+status=3/check=2 failures cannot be retroactively assigned a recipient scope.
+The business code takes precedence over legacy flat codes; explicit conflicting
+sender restrictions still stop. A rejection is never retried automatically.
+
+Sources re-fetched and verified on 2026-10-14:
+- [TikTok web DM client](https://sf16-website-login.neutral.tiktokcdn-eu.com/obj/tiktok_web_login_static_eu/tiktok/webapp/main/react-v18/webapp-desktop/static/js/async/90841.33631d73.js): business code extraction and error enums.
+- [TikTok protobuf schema](https://sf16-website-login.neutral.tiktokcdn-eu.com/obj/tiktok_web_login_static_eu/tiktok/webapp/main/react-v18/webapp-desktop/static/js/async/20855.febfd16d.js): status enum and check_message wire fields.
+
+Recipient-specific business codes from TikTok web client module: 7281, 7282, 7283, 7290,
 7291, 7394. Code 7283 is receiver permission set to no one. Sender-specific codes
 such as 7284, 7289, 7393, generic blocks 7170, and unknown codes stop the daemon.
 Do not infer sender safety from a successful HTTP status.

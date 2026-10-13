@@ -76,10 +76,27 @@ func wBytes(b []byte, n protowire.Number, v []byte) []byte {
 	return protowire.AppendBytes(protowire.AppendTag(b, n, protowire.BytesType), v)
 }
 
-type MessagingDenied struct{ Status, Check uint64 }
+type MessagingDenied struct{ Status, Check, BusinessCode uint64 }
+
+// The web client reads the detailed denial from check_message.status_code.
+// Keep only that numeric code: check_message may contain private response data.
+func messagingDenial(status, check uint64, body []byte, messageField protowire.Number) *MessagingDenied {
+	e := &MessagingDenied{Status: status, Check: check}
+	raw, ok := extractLengthDelimitedField(body, messageField)
+	if !ok || len(raw) > 4096 {
+		return e
+	}
+	var details struct {
+		StatusCode uint64 `json:"status_code"`
+	}
+	if json.Unmarshal(raw, &details) == nil {
+		e.BusinessCode = details.StatusCode
+	}
+	return e
+}
 
 func (e *MessagingDenied) Error() string {
-	return fmt.Sprintf("messaging rejected: status=%d check=%d", e.Status, e.Check)
+	return fmt.Sprintf("messaging rejected: status=%d check=%d business=%d", e.Status, e.Check, e.BusinessCode)
 }
 func (c *Client) PrepareDirectConversation(ctx context.Context, selfID, userID string) (*Conversation, error) {
 	a, e := strconv.ParseUint(selfID, 10, 64)
@@ -152,8 +169,9 @@ func (c *Client) PrepareDirectConversation(ctx context.Context, selfID, userID s
 	if e != nil {
 		return nil, e
 	}
-	if status != 0 || check != 0 {
-		return nil, &MessagingDenied{status, check}
+	denial := messagingDenial(status, check, inner, 3)
+	if status != 0 || check != 0 || denial.BusinessCode != 0 {
+		return nil, denial
 	}
 	info, ok := extractLengthDelimitedField(inner, 1)
 	if !ok {

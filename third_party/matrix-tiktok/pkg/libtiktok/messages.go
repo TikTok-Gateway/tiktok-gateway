@@ -556,8 +556,9 @@ func parseSendResponse(body []byte) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if status != 0 || check != 0 {
-			return "", &MessagingDenied{Status: status, Check: check}
+		denial := messagingDenial(status, check, inner, 6)
+		if status != 0 || check != 0 || denial.BusinessCode != 0 {
+			return "", denial
 		}
 		id, ok := extractStringOrVarintField(inner, 1)
 		numeric, err := strconv.ParseUint(id, 10, 64)

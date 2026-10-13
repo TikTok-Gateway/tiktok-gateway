@@ -117,7 +117,7 @@ func (e *Engine) finish(o Operation, state, reason, pause string) error {
 func rejectionCodes(err error) *TikTokRejection {
 	var rejection *g.APIRejection
 	if errors.As(err, &rejection) {
-		return &TikTokRejection{Status: rejection.Status, Check: rejection.Check}
+		return &TikTokRejection{Status: rejection.Status, Check: rejection.Check, BusinessCode: rejection.BusinessCode}
 	}
 	return nil
 }

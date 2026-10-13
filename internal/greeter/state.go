@@ -22,8 +22,9 @@ type Conversation struct {
 	Source uint64
 }
 type Rejection struct {
-	Status uint64
-	Check  uint64
+	Status       uint64
+	Check        uint64
+	BusinessCode uint64 `json:"businessCode,omitempty"`
 }
 
 type StepResult struct {

@@ -213,23 +213,36 @@ func (t *TikTok) Send(ctx context.Context, c Conversation, kind, text string) (s
 // become permission to continue. Sender restriction codes intentionally stop.
 // Preserve numerical diagnostics; never retain the raw API response or message.
 type APIRejection struct {
-	Status, Check uint64
-	Cause         error
+	Status, Check, BusinessCode uint64
+	Cause                       error
 }
 
 func (e *APIRejection) Error() string {
-	return fmt.Sprintf("messaging rejected: status=%d check=%d", e.Status, e.Check)
+	return fmt.Sprintf("messaging rejected: status=%d check=%d business=%d", e.Status, e.Check, e.BusinessCode)
 }
 func (e *APIRejection) Unwrap() error { return e.Cause }
 func classifyDenied(e *tt.MessagingDenied) error {
 	cause := ErrDenied
-	for _, code := range []uint64{e.Check, e.Status} {
+	// Prefer the detailed business code. The small status/check values describe
+	// the generic protocol rejection, not which user's permissions caused it.
+	codes := []uint64{e.BusinessCode}
+	if e.BusinessCode == 0 {
+		codes = []uint64{e.Check, e.Status}
+	}
+	for _, code := range codes {
 		switch code {
 		case 7281, 7282, 7283, 7290, 7291, 7394:
 			cause = ErrRecipientUnavailable
 		}
 	}
-	return &APIRejection{Status: e.Status, Check: e.Check, Cause: cause}
+	// A conflicting explicit sender restriction always wins.
+	for _, code := range []uint64{e.Status, e.Check, e.BusinessCode} {
+		switch code {
+		case 7284, 7289, 7393, 7170, 7195, 7179:
+			cause = ErrDenied
+		}
+	}
+	return &APIRejection{Status: e.Status, Check: e.Check, BusinessCode: e.BusinessCode, Cause: cause}
 }
 
 // StickerChoices reads only the configured source conversation; it never sends.

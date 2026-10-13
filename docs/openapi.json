@@ -810,6 +810,11 @@
               "check": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "businessCode": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Detailed check_message.status_code when supplied by TikTok; absent in older rejections."
               }
             }
           },
