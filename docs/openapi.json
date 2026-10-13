@@ -1,0 +1,802 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TikTok Gateway",
+    "version": "0.1.0",
+    "description": "One account per service. Durable idempotency, conservative reconciliation, at-least-once webhooks. No exactly-once guarantee."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Process liveness",
+        "operationId": "get__healthz",
+        "responses": {
+          "200": {
+            "description": "Process liveness",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Session and baseline ready; sending may be paused",
+        "operationId": "get__readyz",
+        "responses": {
+          "200": {
+            "description": "Session and baseline ready; sending may be paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "summary": "Account, connection, operation counts, persistent pause and webhook failures",
+        "operationId": "get__v1_status",
+        "responses": {
+          "200": {
+            "description": "Account, connection, operation counts, persistent pause and webhook failures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accountId": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*$",
+                      "description": "Numeric ID encoded as a string; never a JSON number."
+                    },
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "paused": {
+                      "type": "boolean"
+                    },
+                    "pauseReason": {
+                      "type": "string"
+                    },
+                    "queue": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "lastPollAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "pollError": {
+                      "type": "string"
+                    },
+                    "webhook": {
+                      "type": "object",
+                      "properties": {
+                        "pending": {
+                          "type": "integer"
+                        },
+                        "blocked": {
+                          "type": "integer"
+                        },
+                        "lastError": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/messages": {
+      "post": {
+        "summary": "Accept command, not proof of delivery; duplicates return the original operation",
+        "operationId": "post__v1_messages",
+        "responses": {
+          "202": {
+            "description": "Accept command, not proof of delivery; duplicates return the original operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Operation URL"
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid command or missing key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Same key with different command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/operations/{id}": {
+      "get": {
+        "summary": "Read operation",
+        "operationId": "get__v1_operations_id",
+        "responses": {
+          "200": {
+            "description": "Read operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/operations/{id}/reconcile": {
+      "post": {
+        "summary": "Only read history; never send; no server ID means uncertain remains",
+        "operationId": "post__v1_operations_id_reconcile",
+        "responses": {
+          "200": {
+            "description": "Only read history; never send; no server ID means uncertain remains",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Only uncertain operations can reconcile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/stickers": {
+      "get": {
+        "summary": "Owner sticker messages from configured source conversation",
+        "operationId": "get__v1_stickers",
+        "responses": {
+          "200": {
+            "description": "Owner sticker messages from configured source conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stickers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "description": "Numeric ID encoded as a string; never a JSON number."
+                          },
+                          "preview": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stickers/{id}/preview": {
+      "get": {
+        "summary": "Fetch image without exposing signed CDN URL",
+        "operationId": "get__v1_stickers_id_preview",
+        "responses": {
+          "200": {
+            "description": "Fetch image without exposing signed CDN URL",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source sticker not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/control/pause": {
+      "post": {
+        "summary": "Persist sending pause; active external send may finish",
+        "operationId": "post__v1_control_pause",
+        "responses": {
+          "200": {
+            "description": "Persist sending pause; active external send may finish",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paused": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/control/resume": {
+      "post": {
+        "summary": "Validate session, baseline and absence of uncertain operations",
+        "operationId": "post__v1_control_resume",
+        "responses": {
+          "200": {
+            "description": "Validate session, baseline and absence of uncertain operations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paused": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Resume checks failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Command": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "recipientUserId",
+              "type",
+              "text"
+            ],
+            "properties": {
+              "recipientUserId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "Numeric ID encoded as a string; never a JSON number."
+              },
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "recipientUserId",
+              "type",
+              "stickerId"
+            ],
+            "properties": {
+              "recipientUserId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "Numeric ID encoded as a string; never a JSON number."
+              },
+              "type": {
+                "const": "sticker"
+              },
+              "stickerId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "Numeric ID encoded as a string; never a JSON number."
+              }
+            }
+          }
+        ]
+      },
+      "Operation": {
+        "type": "object",
+        "required": [
+          "operationId",
+          "command",
+          "state",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "sending",
+              "verifying",
+              "succeeded",
+              "failed",
+              "uncertain"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "FollowerCreated": {
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "eventId",
+          "type",
+          "accountId",
+          "occurredAt",
+          "detectedAt",
+          "data"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": "1"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "type": {
+            "const": "follower.created"
+          },
+          "accountId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Numeric ID encoded as a string; never a JSON number."
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "userId"
+            ],
+            "properties": {
+              "userId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "Numeric ID encoded as a string; never a JSON number."
+              },
+              "username": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "follower.created": {
+      "post": {
+        "description": "Separate webhook Bearer token. Stable eventId across retries. 2xx acknowledges acceptance only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowerCreated"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Accepted; workflow may still be running"
+          }
+        }
+      }
+    }
+  }
+}

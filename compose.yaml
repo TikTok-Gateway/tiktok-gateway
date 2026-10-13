@@ -1,0 +1,42 @@
+services:
+  tiktok-gateway:
+    image: ${TIKTOK_GATEWAY_IMAGE:-ghcr.io/timnekk/tiktok-gateway:0.1.0}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DATA_DIR: /data
+      TIKTOK_ACCOUNT_ID: ${TIKTOK_ACCOUNT_ID:?Set numeric account ID}
+      TIKTOK_EXPECTED_USERNAME: ${TIKTOK_EXPECTED_USERNAME:-}
+      STICKER_SOURCE_USER_ID: ${STICKER_SOURCE_USER_ID:-}
+      TIKTOK_COOKIE_FILE: /run/secrets/tiktok_cookie
+      API_TOKEN_FILE: /run/secrets/api_token
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      WEBHOOK_TOKEN_FILE: /run/secrets/webhook_token
+      POLL_SECONDS: "45"
+    volumes:
+      - gateway-data:/data
+    secrets:
+      - tiktok_cookie
+      - api_token
+      - webhook_token
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, /gateway, healthcheck]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+secrets:
+  tiktok_cookie:
+    file: ${TIKTOK_COOKIE_PATH:-./.secrets/tiktok-cookie.txt}
+  api_token:
+    file: ${API_TOKEN_PATH:-./.secrets/api-token.txt}
+  webhook_token:
+    file: ${WEBHOOK_TOKEN_PATH:-./.secrets/webhook-token.txt}
+volumes:
+  gateway-data:
