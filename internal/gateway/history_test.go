@@ -130,12 +130,17 @@ func TestIncomingBaselineDedupAndCheckpointAtomicity(t *testing.T) {
 	must(t, e.PollMessages(context.Background()))
 	_, after, err = s.incomingTimes()
 	must(t, err)
-	if !after.Equal(last) {
-		t.Fatal("stalled cursor advanced checkpoint")
+	if !after.After(last) {
+		t.Fatal("completed partial poll did not advance status time")
+	}
+	checkpoint, err := s.conversationCheckpoint(DirectConversation{"0:1:100:200", "200"}, after)
+	must(t, err)
+	if !checkpoint.Equal(last) {
+		t.Fatal("stalled conversation advanced its checkpoint")
 	}
 	status, err := e.IncomingStatus()
 	must(t, err)
-	if status.Error != "message_history_incomplete" {
+	if status.Error != "message_history_partial" || len(status.FailedConversations) != 1 || status.FailedConversations[0].Error != "message_history_incomplete" {
 		t.Fatal(status)
 	}
 }

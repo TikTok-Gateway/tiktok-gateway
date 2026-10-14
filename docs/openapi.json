@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TikTok Gateway",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "One account per service. Durable idempotency, conservative reconciliation, at-least-once webhooks. No exactly-once guarantee."
   },
   "servers": [
@@ -136,10 +136,41 @@
                         },
                         "lastPollAt": {
                           "type": "string",
-                          "format": "date-time"
+                          "format": "date-time",
+                          "description": "Latest completed inbox polling cycle, including partial success."
                         },
                         "error": {
                           "type": "string"
+                        },
+                        "failedConversations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "conversationId",
+                              "userId",
+                              "error",
+                              "checkpointAt"
+                            ],
+                            "properties": {
+                              "conversationId": {
+                                "type": "string"
+                              },
+                              "userId": {
+                                "type": "string",
+                                "pattern": "^[1-9][0-9]*$",
+                                "description": "Numeric ID encoded as a string; never a JSON number."
+                              },
+                              "error": {
+                                "type": "string"
+                              },
+                              "checkpointAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Preserved synchronization watermark; failed reads never advance it."
+                              }
+                            }
+                          }
                         }
                       }
                     }
