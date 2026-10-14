@@ -182,6 +182,16 @@ func (e *Engine) Work(ctx context.Context) error {
 	id, sendErr := e.API.Send(ctx, o.Conversation, o.Command.Type, o.Command.Text)
 	if sendErr != nil || id == "" {
 		o.TikTokRejection = rejectionCodes(sendErr)
+		// On 2026-10-14 this exact rejection affected a sticker after a
+		// delivered text; subsequent text sends also succeeded. Its undocumented
+		// meaning does not justify classifying the recipient as unavailable.
+		// Isolate only the observed sticker rejection, never retry it, and keep
+		// the normal pause policy for text, preflight, and all other codes.
+		if o.Command.Type == "sticker" && errors.Is(sendErr, g.ErrDenied) &&
+			o.TikTokRejection != nil && o.TikTokRejection.Status == 3 &&
+			o.TikTokRejection.Check == 2 && o.TikTokRejection.BusinessCode == 7175 {
+			return e.finish(o, "failed", "tiktok_rejected_sticker", "")
+		}
 		if errors.Is(sendErr, g.ErrRecipientUnavailable) {
 			return e.finish(o, "failed", "recipient_unavailable", "")
 		}

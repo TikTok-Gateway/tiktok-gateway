@@ -136,3 +136,82 @@ func TestRecipientRejectionDoesNotStopOtherRecipient(t *testing.T) {
 		}
 	}
 }
+
+func TestSticker7175IsolationAndRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gateway.db")
+	s, err := Open(path, "100")
+	must(t, err)
+	defer func() { s.Close() }()
+	f := &fake{verify: true, sendErr: &g.APIRejection{Status: 3, Check: 2, BusinessCode: 7175, Cause: g.ErrDenied}}
+	e := &Engine{Store: s, API: f}
+	must(t, s.Ingest(nil, time.Now().Add(-time.Hour)))
+	must(t, e.Resume(context.Background()))
+	c := Command{RecipientUserID: "200", Type: "sticker", StickerID: "1"}
+	first, err := s.Enqueue("sticker-7175", c)
+	must(t, err)
+	must(t, e.Work(context.Background()))
+	must(t, s.Close())
+	s, err = Open(path, "100")
+	must(t, err)
+	e.Store = s
+	got, err := s.Enqueue("sticker-7175", c)
+	must(t, err)
+	if got.ID != first.ID || got.State != "failed" || got.Reason != "tiktok_rejected_sticker" || got.TikTokRejection.BusinessCode != 7175 {
+		t.Fatal(got)
+	}
+	meta, err := s.Meta()
+	must(t, err)
+	if meta.Paused != "" {
+		t.Fatal(meta)
+	}
+	f.sendErr = nil
+	next := command()
+	next.RecipientUserID = "300"
+	second, err := s.Enqueue("next-recipient", next)
+	must(t, err)
+	must(t, e.Work(context.Background()))
+	got, err = s.Get(second.ID)
+	must(t, err)
+	if got.State != "succeeded" || f.sends.Load() != 2 {
+		t.Fatal("next message blocked or failed sticker retried", got, f.sends.Load())
+	}
+}
+
+func TestStickerExceptionDoesNotRelaxOtherRejections(t *testing.T) {
+	for _, tc := range []struct {
+		name, kind, stage       string
+		status, check, business uint64
+	}{
+		{"text", "text", "send", 3, 2, 7175},
+		{"preflight", "sticker", "prepare", 3, 2, 7175},
+		{"unknown", "sticker", "send", 3, 2, 9999},
+		{"sender", "sticker", "send", 3, 2, 7289},
+		{"conflicting-status", "sticker", "send", 7289, 2, 7175},
+		{"conflicting-check", "sticker", "send", 3, 7170, 7175},
+		{"generic-status-only", "sticker", "send", 7175, 2, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, e, f := setup(t)
+			denied := &g.APIRejection{Status: tc.status, Check: tc.check, BusinessCode: tc.business, Cause: g.ErrDenied}
+			if tc.stage == "send" {
+				f.sendErr = denied
+			} else {
+				f.prepareErr = denied
+			}
+			c := command()
+			if tc.kind == "sticker" {
+				c = Command{RecipientUserID: "200", Type: "sticker", StickerID: "1"}
+			}
+			first, err := s.Enqueue("denied", c)
+			must(t, err)
+			must(t, e.Work(context.Background()))
+			got, err := s.Get(first.ID)
+			must(t, err)
+			meta, err := s.Meta()
+			must(t, err)
+			if got.State != "failed" || meta.Paused != "tiktok_restriction" {
+				t.Fatal(got, meta)
+			}
+		})
+	}
+}
