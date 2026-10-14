@@ -96,3 +96,28 @@ func TestPaginationMetadataFailsClosed(t *testing.T) {
 		t.Fatal("empty nonterminal page marked complete", p, err)
 	}
 }
+
+func TestHistoryVisibilityIsRelativeToViewer(t *testing.T) {
+	for _, tc := range []struct {
+		name, visible, invisible, viewer string
+		recalled, hidden                 bool
+	}{
+		{"hidden-for-peer", "", "200", "100", false, false},
+		{"hidden-for-self", "", "100,200", "100", false, true},
+		{"allowed-self", "100", "100", "100", false, false},
+		{"allowed-peer-only", "200", "", "100", false, true},
+		{"unknown-viewer", "", "200", "", false, true},
+		{"recalled-even-if-allowed", "100", "200", "100", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			row := &pb.ConversationMessageEntry{ConversationId: protoString("0:1:100:200"), ServerMessageId: protoUint64(20), SenderUserId: protoUint64(200), TimestampUs: protoUint64(1000000), ContentJson: []byte(`{"aweType":700,"text":"А ты кто?"}`), Tags: []*pb.MetadataTag{{Key: protoString("s:visible"), Value: []byte(tc.visible)}, {Key: protoString("s:invisible"), Value: []byte(tc.invisible)}}}
+			if tc.recalled {
+				row.Tags = append(row.Tags, &pb.MetadataTag{Key: protoString("s:is_recalled"), Value: []byte("1")})
+			}
+			p, err := parseHistoryPage(context.Background(), nil, historyBody(t, row), tc.viewer)
+			if err != nil || p.HasGaps != tc.hidden || (len(p.Messages) == 0) != tc.hidden {
+				t.Fatalf("%+v %v", p, err)
+			}
+		})
+	}
+}

@@ -547,9 +547,9 @@ func buildGetByConversationPayload(deviceID, msToken, verifyFP, convID string, s
 // parseMessageEntry decodes a single message entry from the response.
 // It returns the Message and the raw field-25 timestamp (µs) used as the
 // pagination cursor.
-func parseMessageEntry(ctx context.Context, c *Client, entry *tiktokpb.ConversationMessageEntry) (Message, uint64, error) {
+func parseMessageEntry(ctx context.Context, c *Client, entry *tiktokpb.ConversationMessageEntry, viewerID ...string) (Message, uint64, error) {
 	cursorTs := entry.GetCursorTsUs()
-	if shouldSkipSyncedMessage(entry.GetTags()) {
+	if shouldSkipSyncedMessage(entry.GetTags(), viewerID...) {
 		return Message{}, cursorTs, errSkipSyncedMessage
 	}
 

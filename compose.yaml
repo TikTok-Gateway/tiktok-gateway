@@ -1,6 +1,6 @@
 services:
   tiktok-gateway:
-    image: ${TIKTOK_GATEWAY_IMAGE:-ghcr.io/tiktok-gateway/tiktok-gateway:0.3.3}
+    image: ${TIKTOK_GATEWAY_IMAGE:-ghcr.io/tiktok-gateway/tiktok-gateway:0.3.4}
     restart: unless-stopped
     init: true
     stop_grace_period: 60s

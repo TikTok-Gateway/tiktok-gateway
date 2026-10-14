@@ -17,15 +17,15 @@ type HistoryPage struct {
 	HasGaps    bool
 }
 
-func (c *Client) GetHistoryPage(ctx context.Context, conv *Conversation, cursor string) (HistoryPage, error) {
+func (c *Client) GetHistoryPage(ctx context.Context, conv *Conversation, cursor string, viewerID ...string) (HistoryPage, error) {
 	body, err := c.fetchMessages(ctx, conv, cursor)
 	if err != nil {
 		return HistoryPage{}, err
 	}
-	return parseHistoryPage(ctx, c, body)
+	return parseHistoryPage(ctx, c, body, viewerID...)
 }
 
-func parseHistoryPage(ctx context.Context, c *Client, body []byte) (HistoryPage, error) {
+func parseHistoryPage(ctx context.Context, c *Client, body []byte, viewerID ...string) (HistoryPage, error) {
 	var resp pb.GetByConversationResponse
 	code, err := wireInt(body, 3)
 	if err != nil || code != 0 || unmarshalProto(body, &resp) != nil || resp.GetPayload().GetConversation() == nil {
@@ -47,7 +47,7 @@ func parseHistoryPage(ctx context.Context, c *Client, body []byte) (HistoryPage,
 		page.HasGaps = true
 	}
 	for _, entry := range entries {
-		m, _, err := parseMessageEntry(ctx, c, entry)
+		m, _, err := parseMessageEntry(ctx, c, entry, viewerID...)
 		if err != nil {
 			page.HasGaps = true
 			continue

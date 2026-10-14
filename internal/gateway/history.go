@@ -88,7 +88,7 @@ func (t *TikTok) Messages(ctx context.Context, userID, cursor string) (MessagePa
 		return MessagePage{}, ErrConversationNotFound
 	}
 	// Do not use PrepareDirectConversation here: that method creates a conversation.
-	page, err := t.Client.GetHistoryPage(ctx, &conv, cursor)
+	page, err := t.Client.GetHistoryPage(ctx, &conv, cursor, t.AccountID)
 	if err != nil {
 		return MessagePage{}, err
 	}

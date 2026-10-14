@@ -9,7 +9,7 @@
 
 ## Запуск
 
-Публичный image: `ghcr.io/tiktok-gateway/tiktok-gateway`. Используйте версию `0.3.3`
+Публичный image: `ghcr.io/tiktok-gateway/tiktok-gateway`. Используйте версию `0.3.4`
 или digest (`ghcr.io/tiktok-gateway/tiktok-gateway@sha256:…`). `main` и `sha-<полный SHA>` —
 сборки разработки; `latest` указывает на стабильный релиз. Автообновления нет.
 
@@ -267,3 +267,8 @@ check `exhausted` and `hasGaps` before inferring an opening message. No dialog
 stages or reply decisions are stored in gateway. See [n8n setup](docs/N8N.md#входящие-сообщения-и-история)
 and [OpenAPI](docs/openapi.json). Do not enable incoming delivery with the legacy
 follower-only receiver: use the new Events trigger and its production URL.
+
+Метки истории `s:visible` и `s:invisible` интерпретируются как списки ID
+пользователей относительно аккаунта gateway. Скрытие сообщения для собеседника
+не скрывает его для владельца аккаунта и не создаёт ложный `hasGaps`. Реально
+скрытые для владельца и отозванные сообщения по-прежнему отмечают неполную историю.

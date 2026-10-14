@@ -60,23 +60,49 @@ func extractClientMsgIDFromTags(tags []*tiktokpb.MetadataTag) string {
 // shouldSkipSyncedMessage reports whether a get_by_conversation row or WS chat
 // detail is a recalled or invisible placeholder. TikTok carries these on field 9
 // (repeated MetadataTag tags).
-func shouldSkipSyncedMessage(tags []*tiktokpb.MetadataTag) bool {
+func shouldSkipSyncedMessage(tags []*tiktokpb.MetadataTag, viewerID ...string) bool {
+	viewer := ""
+	if len(viewerID) > 0 {
+		viewer = viewerID[0]
+	}
+	visible, invisible := "", ""
 	for _, tag := range tags {
 		if tag == nil {
 			continue
 		}
+		value := strings.TrimSpace(string(tag.GetValue()))
 		switch tag.GetKey() {
 		case "s:is_recalled":
-			if strings.TrimSpace(string(tag.GetValue())) == "1" {
+			if value == "1" {
 				return true
 			}
+		case "s:visible":
+			visible = value
 		case "s:invisible":
-			if strings.TrimSpace(string(tag.GetValue())) != "" {
+			invisible = value
+		}
+	}
+	// TikTok web SDK visibility is relative to ctx.option.userId. These tags
+	// are comma-separated viewer IDs, not boolean flags. The allowlist wins.
+	// Without viewer context retain conservative handling of restricted rows.
+	if visible == "" && invisible == "" {
+		return false
+	}
+	if viewer == "" {
+		return true
+	}
+	contains := func(list string) bool {
+		for _, id := range strings.Split(list, ",") {
+			if strings.TrimSpace(id) == viewer {
 				return true
 			}
 		}
+		return false
 	}
-	return false
+	if visible != "" {
+		return !contains(visible)
+	}
+	return contains(invisible)
 }
 
 func parseReactionsProto(entries []*tiktokpb.ReactionSummary) []Reaction {
