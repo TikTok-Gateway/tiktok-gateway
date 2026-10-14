@@ -9,7 +9,7 @@
 
 ## Запуск
 
-Публичный image: `ghcr.io/tiktok-gateway/tiktok-gateway`. Используйте версию `0.3.1`
+Публичный image: `ghcr.io/tiktok-gateway/tiktok-gateway`. Используйте версию `0.3.2`
 или digest (`ghcr.io/tiktok-gateway/tiktok-gateway@sha256:…`). `main` и `sha-<полный SHA>` —
 сборки разработки; `latest` указывает на стабильный релиз. Автообновления нет.
 

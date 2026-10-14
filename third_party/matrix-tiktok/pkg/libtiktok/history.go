@@ -3,7 +3,6 @@ package libtiktok
 import (
 	"context"
 	"errors"
-	"strconv"
 
 	pb "github.com/httpjamesm/matrix-tiktok/pkg/libtiktok/pb"
 )
@@ -32,16 +31,23 @@ func parseHistoryPage(ctx context.Context, c *Client, body []byte) (HistoryPage,
 	if err != nil || code != 0 || unmarshalProto(body, &resp) != nil || resp.GetPayload().GetConversation() == nil {
 		return HistoryPage{}, errors.New("invalid_history_response")
 	}
-	entries := resp.GetPayload().GetConversation().GetEntries()
-	page := HistoryPage{Messages: []Message{}, Exhausted: len(entries) == 0}
-	var min uint64
+	list := resp.GetPayload().GetConversation()
+	next, more, err := historyPagination(list)
+	if err != nil {
+		return HistoryPage{}, err
+	}
+	entries := list.GetEntries()
+	// Preserve the gateway/n8n contract: even has_more=false on a nonempty
+	// page requires one more request confirming an empty terminal page.
+	page := HistoryPage{Messages: []Message{}, NextCursor: next, Exhausted: len(entries) == 0 && !more}
+	if page.Exhausted {
+		page.NextCursor = ""
+	}
+	if len(entries) == 0 && more {
+		page.HasGaps = true
+	}
 	for _, entry := range entries {
-		m, cursor, err := parseMessageEntry(ctx, c, entry)
-		if cursor == 0 {
-			page.HasGaps = true
-		} else if min == 0 || cursor < min {
-			min = cursor
-		}
+		m, _, err := parseMessageEntry(ctx, c, entry)
 		if err != nil {
 			page.HasGaps = true
 			continue
@@ -50,9 +56,6 @@ func parseHistoryPage(ctx context.Context, c *Client, body []byte) (HistoryPage,
 			page.HasGaps = true
 		}
 		page.Messages = append(page.Messages, m)
-	}
-	if min != 0 {
-		page.NextCursor = strconv.FormatUint(min, 10)
 	}
 	return page, nil
 }

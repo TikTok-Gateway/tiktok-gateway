@@ -631,76 +631,22 @@ func parseMessageEntry(ctx context.Context, c *Client, entry *tiktokpb.Conversat
 	}, cursorTs, nil
 }
 
-// parseGetByConversationResponse decodes the protobuf response body.
-// Returns the list of messages and the next-page cursor: the minimum non-zero
-// field-25 cursor_ts_us among entries (oldest anchor in the batch). Using the
-// minimum is required regardless of whether the server lists entries newest-
-// or oldest-first; using only the last wire row could repeat the same page forever.
+// parseGetByConversationResponse shares the strict server pagination parser.
 func parseGetByConversationResponse(ctx context.Context, c *Client, body []byte) ([]Message, string, error) {
-	if code, err := wireInt(body, 3); err != nil || code != 0 {
-		return nil, "", fmt.Errorf("history API status invalid: %d", code)
+	page, err := parseHistoryPage(ctx, c, body)
+	if err != nil {
+		return nil, "", err
 	}
-
-	log := zerolog.Ctx(ctx)
-	var resp tiktokpb.GetByConversationResponse
-	if err := unmarshalProto(body, &resp); err != nil {
-		return nil, "", fmt.Errorf("decode top-level response: %w", err)
-	}
-
-	entries := resp.GetPayload().GetConversation().GetEntries()
-	if len(entries) == 0 {
-		return nil, "", nil
-	}
-
-	messages := make([]Message, 0, len(entries))
-	var minCursorTs uint64
-	considerCursor := func(cursorTs uint64) {
-		if cursorTs == 0 {
-			return
-		}
-		if minCursorTs == 0 || cursorTs < minCursorTs {
-			minCursorTs = cursorTs
-		}
-	}
-	for i, entry := range entries {
-		m, cursorTs, err := parseMessageEntry(ctx, c, entry)
-		if errors.Is(err, errSkipSyncedMessage) {
-			log.Debug().
-				Int("entry_index", i).
-				Int("entries_total", len(entries)).
-				Uint64("cursor_ts_us", cursorTs).
-				Msg("Skipping synced/recalled conversation message entry")
-			considerCursor(cursorTs)
-			continue
-		}
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Int("entry_index", i).
-				Int("entries_total", len(entries)).
-				Msg("Failed to parse conversation message entry")
-			continue
-		}
-		messages = append(messages, m)
-		considerCursor(cursorTs)
-	}
-
-	// Reverse so messages are in chronological order (oldest first).
+	messages := page.Messages
 	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
 		messages[i], messages[j] = messages[j], messages[i]
 	}
-
-	nextCursor := ""
-	if minCursorTs != 0 {
-		nextCursor = strconv.FormatUint(minCursorTs, 10)
-	}
-	return messages, nextCursor, nil
+	return messages, page.NextCursor, nil
 }
 
 // GetMessages fetches up to 20 messages for the given conversation.
 // Pass an empty cursor for the first page; subsequent pages use the cursor
-// string returned by the previous call (the field-25 µs timestamp of the
-// oldest message in the last batch).
+// server next_cursor returned by the previous call.
 // Returns the messages and the next-page cursor (empty string when exhausted).
 func (c *Client) GetMessages(ctx context.Context, conv *Conversation, cursor string) ([]Message, string, error) {
 	body, err := c.fetchMessages(ctx, conv, cursor)

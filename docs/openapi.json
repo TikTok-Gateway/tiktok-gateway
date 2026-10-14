@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TikTok Gateway",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "description": "One account per service. Durable idempotency, conservative reconciliation, at-least-once webhooks. No exactly-once guarantee."
   },
   "servers": [
