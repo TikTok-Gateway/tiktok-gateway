@@ -961,6 +961,10 @@
           "reason": {
             "type": "string"
           },
+          "sendError": {
+            "type": "string",
+            "description": "Persisted send error diagnostic, with response bodies, URLs and credential headers omitted; at most 2048 characters plus truncation marker. Absent on older operations."
+          },
           "tiktokRejection": {
             "type": "object",
             "description": "Numerical TikTok rejection diagnostics, when available. Older operations may omit this field.",
