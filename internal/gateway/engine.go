@@ -181,6 +181,7 @@ func (e *Engine) Work(ctx context.Context) error {
 	}
 	id, sendErr := e.API.Send(ctx, o.Conversation, o.Command.Type, o.Command.Text)
 	if sendErr != nil || id == "" {
+		o.SendError = sendErrorDiagnostic(sendErr)
 		o.TikTokRejection = rejectionCodes(sendErr)
 		// On 2026-10-14 this exact rejection affected a sticker after a
 		// delivered text; subsequent text sends also succeeded. Its undocumented

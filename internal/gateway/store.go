@@ -36,6 +36,7 @@ type TikTokRejection struct {
 }
 
 type Operation struct {
+	SendError       string           `json:"sendError,omitempty"`
 	TikTokRejection *TikTokRejection `json:"tiktokRejection,omitempty"`
 	ID              string           `json:"operationId"`
 	Command         Command          `json:"command"`
