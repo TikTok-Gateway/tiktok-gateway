@@ -374,7 +374,7 @@ func TestDetailedRestrictionClassification(t *testing.T) {
 		code      uint64
 		recipient bool
 	}{
-		{7202, true}, {7409, true}, {7281, true}, {7282, true}, {7283, true}, {7290, true}, {7291, true}, {7394, true},
+		{7192, true}, {7202, true}, {7409, true}, {7281, true}, {7282, true}, {7283, true}, {7290, true}, {7291, true}, {7394, true},
 		{7284, false}, {7289, false}, {7393, false}, {7170, false}, {7195, false}, {7179, false}, {0, false}, {9999, false},
 	} {
 		err := classifyDenied(&tt.MessagingDenied{Status: 3, Check: 2, BusinessCode: v.code})
@@ -387,10 +387,22 @@ func TestDetailedRestrictionClassification(t *testing.T) {
 		}
 	}
 	for _, denial := range []*tt.MessagingDenied{
+		{Status: 7192}, {Check: 7192}, {Status: 7289, BusinessCode: 7192},
 		{Status: 7409}, {Check: 7409}, {Status: 7289, Check: 2, BusinessCode: 7409}, {Status: 7202}, {Check: 7202}, {Status: 7289, Check: 2, BusinessCode: 7202}, {Status: 7289, Check: 7283}, {Status: 7289, Check: 2, BusinessCode: 7283}, {Status: 3, Check: 7283, BusinessCode: 9999},
 	} {
 		if !errors.Is(classifyDenied(denial), ErrDenied) {
 			t.Fatal("conflicting or unknown restriction was ignored")
 		}
+	}
+}
+
+func TestRecipient7192WithZeroProtocolStatus(t *testing.T) {
+	err := classifyDenied(&tt.MessagingDenied{BusinessCode: 7192})
+	if !errors.Is(err, ErrRecipientUnavailable) || errors.Is(err, ErrDenied) {
+		t.Fatalf("7192 must only skip recipient: %v", err)
+	}
+	var detail *APIRejection
+	if !errors.As(err, &detail) || detail.Status != 0 || detail.Check != 0 || detail.BusinessCode != 7192 {
+		t.Fatalf("lost rejection diagnostics: %v", err)
 	}
 }

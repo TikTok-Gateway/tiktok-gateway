@@ -97,11 +97,14 @@ func TestOperationWithoutRejectionRemainsCompatible(t *testing.T) {
 }
 
 func TestRecipientRejectionDoesNotStopOtherRecipient(t *testing.T) {
-	for _, code := range []uint64{7202, 7409} {
+	for _, code := range []uint64{7192, 7202, 7409} {
 		for _, stage := range []string{"send", "prepare"} {
 			t.Run(fmt.Sprintf("%s/%d", stage, code), func(t *testing.T) {
 				s, e, f := setup(t)
 				denied := &g.APIRejection{Status: 3, Check: 2, BusinessCode: code, Cause: g.ErrRecipientUnavailable}
+				if code == 7192 {
+					denied.Status, denied.Check = 0, 0
+				}
 				if stage == "send" {
 					f.sendErr = denied
 				} else {
