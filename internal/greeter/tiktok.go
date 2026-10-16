@@ -238,7 +238,9 @@ func classifyDenied(e *tt.MessagingDenied) error {
 	// Observed with status=3/check=2 for recipients whose TikTok UI disallows
 	// messaging (2026-10-14). Treat only the detailed code as recipient-scoped;
 	// this does not establish which privacy/eligibility setting caused it.
-	if e.BusinessCode == 7202 || e.BusinessCode == 7409 {
+	// 7192 was confirmed as recipient-unavailable in the TikTok UI by the
+	// account owner on 2026-10-16 (status=0/check=0, Welcome execution 821).
+	if e.BusinessCode == 7192 || e.BusinessCode == 7202 || e.BusinessCode == 7409 {
 		cause = ErrRecipientUnavailable
 	}
 	// A conflicting explicit sender restriction always wins.
